@@ -1,0 +1,30 @@
+{
+  "name": "gtd-matrix-tasks",
+  "version": "1.0.0",
+  "description": "An interactive, drag-and-drop GTD & Eisenhower Matrix task list view for Obsidian.",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "npm run typecheck && node esbuild.config.mjs production",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-plugin.ps1"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "gtd",
+    "eisenhower-matrix",
+    "tasks"
+  ],
+  "author": "Josef dela Cuesta",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "latest",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
