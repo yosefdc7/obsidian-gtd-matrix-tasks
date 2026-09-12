@@ -345,6 +345,7 @@
   display: inline;
 }
 
+.gtd-task-desc a,
 .gtd-task-desc a.internal-link,
 .gtd-task-desc a.external-link {
   color: var(--text-accent);
@@ -353,6 +354,7 @@
   cursor: pointer;
 }
 
+.gtd-task-desc a:hover,
 .gtd-task-desc a.internal-link:hover,
 .gtd-task-desc a.external-link:hover {
   text-decoration: underline;

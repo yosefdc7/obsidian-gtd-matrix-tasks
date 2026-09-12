@@ -418,6 +418,11 @@ export class GTDMatrixView extends ItemView {
 
     itemEl.draggable = true;
     itemEl.addEventListener('dragstart', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('a') || target.closest('button') || target.closest('input') || target.closest('.gtd-desc-inline-input')) {
+        e.preventDefault();
+        return;
+      }
       if (e.dataTransfer) {
         e.dataTransfer.setData('text/plain', task.id);
         e.dataTransfer.effectAllowed = 'move';
@@ -458,15 +463,48 @@ export class GTDMatrixView extends ItemView {
     } else {
       descEl.setText('(No description)');
     }
-    descEl.title = 'Click to edit description (or click links to open)';
+    descEl.title = 'Click to edit description (or click links to open in a new tab)';
 
     descEl.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
-      if (target.closest('a') || target.classList.contains('internal-link') || target.classList.contains('external-link')) {
-        return; // Let Obsidian handle navigation
+      const anchor = target.closest('a');
+      if (anchor) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const href = anchor.getAttribute('data-href') || anchor.getAttribute('href');
+        if (!href) return;
+
+        const isExternal = anchor.classList.contains('external-link') || /^(https?:|\/\/)/i.test(href);
+        if (isExternal) {
+          window.open(href, '_blank');
+        } else {
+          void this.app.workspace.openLinkText(href, task.filePath, 'tab');
+        }
+        return;
       }
+
       e.stopPropagation();
       this.makeEditable(descEl, task);
+    });
+
+    descEl.addEventListener('mouseover', (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (anchor) {
+        const href = anchor.getAttribute('data-href') || anchor.getAttribute('href');
+        const isExternal = anchor.classList.contains('external-link') || (href ? /^(https?:|\/\/)/i.test(href) : false);
+        if (href && !isExternal) {
+          this.app.workspace.trigger('hover-link', {
+            event,
+            source: 'gtd-matrix-tasks',
+            hoverParent: descEl,
+            targetEl: anchor,
+            linktext: href,
+            sourcePath: task.filePath
+          });
+        }
+      }
     });
 
     // Edit button on hover
@@ -531,11 +569,21 @@ export class GTDMatrixView extends ItemView {
       cls: `gtd-file-link ${task.isProject ? 'is-project-link' : ''}`,
       text: task.isProject ? `📂 ${task.fileName}` : `[[${task.fileName}]]`
     });
-    fileLink.title = `Open ${task.filePath}`;
+    fileLink.title = `Open ${task.filePath} in a new tab`;
     fileLink.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      this.app.workspace.openLinkText(task.filePath, '', false);
+      void this.app.workspace.openLinkText(task.filePath, '', 'tab');
+    });
+    fileLink.addEventListener('mouseover', (event: MouseEvent) => {
+      this.app.workspace.trigger('hover-link', {
+        event,
+        source: 'gtd-matrix-tasks',
+        hoverParent: metaEl,
+        targetEl: fileLink,
+        linktext: task.filePath,
+        sourcePath: ''
+      });
     });
   }
 
