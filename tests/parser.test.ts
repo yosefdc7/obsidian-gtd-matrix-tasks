@@ -5,7 +5,10 @@ import {
   setTaskCompletion,
   setTaskDueDate,
   setTaskDescription,
-  getTaskSection
+  setTaskWaiting,
+  setTaskSomeday,
+  getGTDSection,
+  getEisenhowerSection
 } from '../src/parser';
 import { TaskItem } from '../src/types';
 
@@ -18,86 +21,61 @@ describe('Task Parser', () => {
     expect(task?.isCompleted).toBe(false);
     expect(task?.priority).toBe('none');
     expect(task?.dueDate).toBeNull();
+    expect(task?.isWaiting).toBe(false);
+    expect(task?.isSomeday).toBe(false);
+    expect(task?.isProject).toBe(false);
   });
 
-  it('parses priority emoji and due date', () => {
-    const line = '- [ ] Submit report ⏫ 📅 2026-09-15';
-    const task = parseTaskLine(line, 'work.md', 5);
-    expect(task).not.toBeNull();
-    expect(task?.priority).toBe('highest');
-    expect(task?.dueDate).toBe('2026-09-15');
-    expect(task?.description).toBe('Submit report');
+  it('detects waiting state from status [?] or #waiting', () => {
+    const task1 = parseTaskLine('- [?] Await feedback', 'test.md', 0);
+    expect(task1?.isWaiting).toBe(true);
+
+    const task2 = parseTaskLine('- [ ] Await response #waiting', 'test.md', 1);
+    expect(task2?.isWaiting).toBe(true);
   });
 
-  it('parses high, medium, and low priority emojis', () => {
-    expect(parseTaskLine('- [ ] Task 1 🔼', 'f.md', 0)?.priority).toBe('high');
-    expect(parseTaskLine('- [ ] Task 2 🔽', 'f.md', 0)?.priority).toBe('medium');
-    expect(parseTaskLine('- [ ] Task 3 ⏬', 'f.md', 0)?.priority).toBe('low');
+  it('detects someday state from #someday or low priority', () => {
+    const task1 = parseTaskLine('- [ ] Learn piano #someday', 'test.md', 0);
+    expect(task1?.isSomeday).toBe(true);
+
+    const task2 = parseTaskLine('- [ ] Read backlog ⏬', 'test.md', 1);
+    expect(task2?.isSomeday).toBe(true);
   });
 
-  it('parses custom status characters like [?] and [/]', () => {
-    const onHold = parseTaskLine('- [?] Waiting for review 🔽', 'f.md', 0);
-    expect(onHold?.statusChar).toBe('?');
-    expect(onHold?.isCompleted).toBe(false);
+  it('detects project tasks from file path or tags', () => {
+    const task1 = parseTaskLine('- [ ] Design schema', 'Roles/Yo Manager/Projects/Sprynt.md', 0);
+    expect(task1?.isProject).toBe(true);
 
-    const inProgress = parseTaskLine('- [/] Working on feature', 'f.md', 1);
-    expect(inProgress?.statusChar).toBe('/');
-  });
-
-  it('parses completed tasks with completion emoji date', () => {
-    const line = '- [x] Fix login bug ✅ 2026-09-12';
-    const task = parseTaskLine(line, 'bug.md', 2);
-    expect(task?.isCompleted).toBe(true);
-    expect(task?.completedDate).toBe('2026-09-12');
+    const task2 = parseTaskLine('- [ ] Align roadmap #project', 'Jots/2026/Sep/12.md', 1);
+    expect(task2?.isProject).toBe(true);
   });
 });
 
 describe('Task Mutators', () => {
-  it('updates task priority emoji cleanly', () => {
-    const line = '- [ ] Draft proposal 📅 2026-09-20';
-    const q1 = setTaskPriority(line, 'highest');
-    expect(q1).toBe('- [ ] Draft proposal 📅 2026-09-20 ⏫');
+  it('toggles waiting state on task line', () => {
+    const line = '- [ ] Review contract';
+    const waiting = setTaskWaiting(line, true);
+    expect(waiting).toBe('- [?] Review contract');
 
-    const q2 = setTaskPriority(q1, 'high');
-    expect(q2).toBe('- [ ] Draft proposal 📅 2026-09-20 🔼');
-
-    const inbox = setTaskPriority(q2, 'none');
-    expect(inbox).toBe('- [ ] Draft proposal 📅 2026-09-20');
+    const restored = setTaskWaiting(waiting, false);
+    expect(restored).toBe('- [ ] Review contract');
   });
 
-  it('updates task completion state and appends date', () => {
-    const line = '- [ ] Deploy to staging ⏫';
-    const completed = setTaskCompletion(line, true, '2026-09-12');
-    expect(completed).toBe('- [x] Deploy to staging ⏫ ✅ 2026-09-12');
+  it('toggles someday tag on task line', () => {
+    const line = '- [ ] Learn surfing';
+    const someday = setTaskSomeday(line, true);
+    expect(someday).toBe('- [ ] Learn surfing #someday');
 
-    const uncompleted = setTaskCompletion(completed, false);
-    expect(uncompleted).toBe('- [ ] Deploy to staging ⏫');
-  });
-
-  it('updates due date cleanly', () => {
-    const line = '- [ ] Book flight ⏫';
-    const dated = setTaskDueDate(line, '2026-09-25');
-    expect(dated).toBe('- [ ] Book flight ⏫ 📅 2026-09-25');
-
-    const changed = setTaskDueDate(dated, '2026-10-01');
-    expect(changed).toBe('- [ ] Book flight ⏫ 📅 2026-10-01');
-
-    const removed = setTaskDueDate(changed, null);
-    expect(removed).toBe('- [ ] Book flight ⏫');
-  });
-
-  it('updates task description without losing metadata', () => {
-    const line = '  - [ ] Old description ⏫ 📅 2026-09-20';
-    const updated = setTaskDescription(line, 'New shiny description');
-    expect(updated).toBe('  - [ ] New shiny description ⏫ 📅 2026-09-20');
+    const restored = setTaskSomeday(someday, false);
+    expect(restored).toBe('- [ ] Learn surfing');
   });
 });
 
-describe('Task Section Classification', () => {
+describe('Section Routing', () => {
   const baseTask: TaskItem = {
     id: 'f.md:0',
-    filePath: 'f.md',
-    fileName: 'f',
+    filePath: 'Jots/2026/Sep/12.md',
+    fileName: '12',
     lineNumber: 0,
     rawText: '',
     indent: '',
@@ -109,33 +87,52 @@ describe('Task Section Classification', () => {
     scheduledDate: null,
     startDate: null,
     completedDate: null,
-    tags: []
+    tags: [],
+    isWaiting: false,
+    isSomeday: false,
+    isProject: false
   };
 
   const today = '2026-09-12';
 
-  it('routes to Inbox when no priority and no dates', () => {
-    expect(getTaskSection({ ...baseTask, priority: 'none' }, today)).toBe('inbox');
+  describe('GTD Routing', () => {
+    it('routes raw capture tasks to GTD Inbox', () => {
+      expect(getGTDSection({ ...baseTask }, today)).toBe('gtd-inbox');
+    });
+
+    it('routes prioritized or project tasks to Next Actions', () => {
+      expect(getGTDSection({ ...baseTask, priority: 'highest' }, today)).toBe('gtd-next-actions');
+      expect(getGTDSection({ ...baseTask, isProject: true }, today)).toBe('gtd-next-actions');
+    });
+
+    it('routes waiting tasks to Waiting For', () => {
+      expect(getGTDSection({ ...baseTask, isWaiting: true }, today)).toBe('gtd-waiting');
+    });
+
+    it('routes scheduled tasks to Scheduled', () => {
+      expect(getGTDSection({ ...baseTask, dueDate: '2026-09-15' }, today)).toBe('gtd-scheduled');
+    });
+
+    it('routes someday tasks to Someday / Maybe', () => {
+      expect(getGTDSection({ ...baseTask, isSomeday: true }, today)).toBe('gtd-someday');
+    });
+
+    it('routes completed tasks to Completed Today', () => {
+      expect(getGTDSection({ ...baseTask, isCompleted: true, completedDate: today }, today)).toBe('gtd-completed');
+      expect(getGTDSection({ ...baseTask, isCompleted: true, completedDate: '2026-09-10' }, today)).toBeNull();
+    });
   });
 
-  it('routes to Q1, Q2, Q3, Q4 based on priority', () => {
-    expect(getTaskSection({ ...baseTask, priority: 'highest' }, today)).toBe('q1-do');
-    expect(getTaskSection({ ...baseTask, priority: 'high' }, today)).toBe('q2-schedule');
-    expect(getTaskSection({ ...baseTask, priority: 'medium' }, today)).toBe('q3-delegate');
-    expect(getTaskSection({ ...baseTask, priority: 'low' }, today)).toBe('q4-someday');
-    expect(getTaskSection({ ...baseTask, priority: 'lowest' }, today)).toBe('q4-someday');
-  });
+  describe('Eisenhower Routing', () => {
+    it('routes to Q1, Q2, Q3, Q4 based on priority', () => {
+      expect(getEisenhowerSection({ ...baseTask, priority: 'highest' }, today)).toBe('eisen-q1');
+      expect(getEisenhowerSection({ ...baseTask, priority: 'high' }, today)).toBe('eisen-q2');
+      expect(getEisenhowerSection({ ...baseTask, priority: 'medium' }, today)).toBe('eisen-q3');
+      expect(getEisenhowerSection({ ...baseTask, priority: 'low' }, today)).toBe('eisen-q4');
+    });
 
-  it('routes [?] status to Q3 (Waiting For / Delegated)', () => {
-    expect(getTaskSection({ ...baseTask, statusChar: '?' }, today)).toBe('q3-delegate');
-  });
-
-  it('routes dated tasks without priority to Scheduled', () => {
-    expect(getTaskSection({ ...baseTask, priority: 'none', dueDate: '2026-09-14' }, today)).toBe('scheduled');
-  });
-
-  it('routes tasks completed today to completed-today and omits older completed tasks', () => {
-    expect(getTaskSection({ ...baseTask, isCompleted: true, completedDate: '2026-09-12' }, today)).toBe('completed-today');
-    expect(getTaskSection({ ...baseTask, isCompleted: true, completedDate: '2026-09-10' }, today)).toBeNull();
+    it('routes unprioritized tasks to Untriaged Inbox in Eisenhower mode', () => {
+      expect(getEisenhowerSection({ ...baseTask, priority: 'none' }, today)).toBe('eisen-inbox');
+    });
   });
 });

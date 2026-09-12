@@ -1,5 +1,25 @@
 export type TaskPriority = 'highest' | 'high' | 'medium' | 'low' | 'lowest' | 'none';
 
+export type ViewMode = 'gtd' | 'eisenhower';
+
+export type GTDSectionId =
+  | 'gtd-inbox'
+  | 'gtd-next-actions'
+  | 'gtd-waiting'
+  | 'gtd-scheduled'
+  | 'gtd-someday'
+  | 'gtd-completed';
+
+export type EisenhowerSectionId =
+  | 'eisen-q1'
+  | 'eisen-q2'
+  | 'eisen-q3'
+  | 'eisen-q4'
+  | 'eisen-inbox'
+  | 'eisen-completed';
+
+export type SectionId = GTDSectionId | EisenhowerSectionId;
+
 export interface TaskItem {
   id: string;
   filePath: string;
@@ -16,16 +36,10 @@ export interface TaskItem {
   startDate: string | null;
   completedDate: string | null;
   tags: string[];
+  isWaiting: boolean;
+  isSomeday: boolean;
+  isProject: boolean;
 }
-
-export type SectionId =
-  | 'inbox'
-  | 'q1-do'
-  | 'q2-schedule'
-  | 'q3-delegate'
-  | 'scheduled'
-  | 'q4-someday'
-  | 'completed-today';
 
 export interface SectionDefinition {
   id: SectionId;
@@ -33,13 +47,14 @@ export interface SectionDefinition {
   subtitle: string;
   badgeClass: string;
   icon: string;
-  targetPriority: TaskPriority;
+  targetPriority?: TaskPriority;
 }
 
 export interface PluginSettings {
   excludedFolders: string[];
   autoAddCreatedDate: boolean;
   defaultDailyNoteFolder: string;
+  defaultViewMode: ViewMode;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -49,5 +64,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     'References/System/Tests'
   ],
   autoAddCreatedDate: false,
-  defaultDailyNoteFolder: 'Jots'
+  defaultDailyNoteFolder: 'Jots',
+  defaultViewMode: 'gtd'
 };

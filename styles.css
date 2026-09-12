@@ -67,6 +67,69 @@
   color: var(--text-normal);
 }
 
+/* Mode Switcher Segmented Control */
+.gtd-mode-switcher {
+  display: inline-flex;
+  border-radius: 8px;
+  background-color: var(--background-modifier-border);
+  padding: 2px;
+  gap: 2px;
+}
+
+.gtd-mode-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.gtd-mode-btn.is-active {
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.gtd-mode-btn:hover:not(.is-active) {
+  color: var(--text-normal);
+}
+
+/* Quick Filter Chips */
+.gtd-chips-wrapper {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.gtd-chip-btn {
+  padding: 4px 11px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 0.8em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.gtd-chip-btn.is-active {
+  border-color: var(--interactive-accent);
+  background-color: rgba(var(--interactive-accent-rgb), 0.12);
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+.gtd-chip-btn:hover:not(.is-active) {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
 .gtd-stats-pill {
   font-size: 0.85em;
   font-weight: 500;
@@ -100,6 +163,7 @@
 
 /* Color Accent Borders */
 .gtd-section.badge-inbox { border-left: 4px solid #14b8a6; }
+.gtd-section.badge-next-actions { border-left: 4px solid #3b82f6; }
 .gtd-section.badge-q1 { border-left: 4px solid #ef4444; }
 .gtd-section.badge-q2 { border-left: 4px solid #3b82f6; }
 .gtd-section.badge-q3 { border-left: 4px solid #f59e0b; }

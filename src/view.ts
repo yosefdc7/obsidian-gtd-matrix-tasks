@@ -1,72 +1,105 @@
 import { ItemView, WorkspaceLeaf, setIcon, Menu } from 'obsidian';
 import { VaultScanner } from './vault-scanner';
-import { TaskItem, TaskPriority, SectionId, SectionDefinition } from './types';
-import { getTaskSection } from './parser';
+import { TaskItem, TaskPriority, SectionId, SectionDefinition, ViewMode } from './types';
+import { getGTDSection, getEisenhowerSection } from './parser';
 
 export const VIEW_TYPE_GTD_MATRIX = 'gtd-matrix-tasks-view';
 
-const SECTIONS: SectionDefinition[] = [
+const GTD_SECTIONS: SectionDefinition[] = [
   {
-    id: 'inbox',
-    title: 'Inbox — Untriaged Tasks',
-    subtitle: 'Tasks with no priority assigned yet. Triage or prioritize them.',
+    id: 'gtd-inbox',
+    title: 'Inbox — Capture',
+    subtitle: 'Raw unprocessed capture items and daily note jots.',
     badgeClass: 'badge-inbox',
-    icon: 'inbox',
-    targetPriority: 'none'
+    icon: 'inbox'
   },
   {
-    id: 'q1-do',
-    title: 'Q1: Urgent & Important — Do First',
-    subtitle: 'Crises, deadlines, and highest-impact commitments.',
-    badgeClass: 'badge-q1',
-    icon: 'alert-triangle',
-    targetPriority: 'highest'
+    id: 'gtd-next-actions',
+    title: 'Next Actions — Ready to Do',
+    subtitle: 'Clarified actionable steps ready to execute now.',
+    badgeClass: 'badge-next-actions',
+    icon: 'zap'
   },
   {
-    id: 'q2-schedule',
-    title: 'Q2: Important — Schedule & Focus',
-    subtitle: 'Strategic goals, deep work, health, and skill building.',
-    badgeClass: 'badge-q2',
-    icon: 'compass',
-    targetPriority: 'high'
-  },
-  {
-    id: 'q3-delegate',
-    title: 'Q3: Urgent — Delegate & Waiting',
-    subtitle: 'Blocked or delegated tasks.',
+    id: 'gtd-waiting',
+    title: 'Waiting For — Blocked & Delegated',
+    subtitle: 'Tasks on hold [?] or awaiting someone else (#waiting).',
     badgeClass: 'badge-q3',
-    icon: 'clock',
-    targetPriority: 'medium'
+    icon: 'clock'
   },
   {
-    id: 'scheduled',
-    title: 'Scheduled & Due This Week',
-    subtitle: 'Tasks with due or scheduled dates within the next 7 days.',
+    id: 'gtd-scheduled',
+    title: 'Scheduled — Calendar & Deadlines',
+    subtitle: 'Commitments due or scheduled in the next 7 days.',
     badgeClass: 'badge-scheduled',
-    icon: 'calendar',
-    targetPriority: 'none'
+    icon: 'calendar'
   },
   {
-    id: 'q4-someday',
-    title: 'Q4: Low Priority — Someday / Maybe',
-    subtitle: 'Low-priority backlog, deferred reading, or ideas.',
+    id: 'gtd-someday',
+    title: 'Someday / Maybe — Incubating Backlog',
+    subtitle: 'Ideas, aspirational projects, and deferred backlog.',
     badgeClass: 'badge-q4',
-    icon: 'archive',
-    targetPriority: 'low'
+    icon: 'archive'
   },
   {
-    id: 'completed-today',
+    id: 'gtd-completed',
     title: 'Completed Today',
-    subtitle: 'Tasks checked off today. Keep up the momentum!',
+    subtitle: 'Tasks checked off today. Celebrate your momentum!',
     badgeClass: 'badge-done',
-    icon: 'check-circle',
-    targetPriority: 'none'
+    icon: 'check-circle'
+  }
+];
+
+const EISENHOWER_SECTIONS: SectionDefinition[] = [
+  {
+    id: 'eisen-q1',
+    title: 'Q1: Urgent & Important — Do First',
+    subtitle: 'Crises, pressing deadlines, and top priorities.',
+    badgeClass: 'badge-q1',
+    icon: 'alert-triangle'
+  },
+  {
+    id: 'eisen-q2',
+    title: 'Q2: Important — Schedule & Focus',
+    subtitle: 'Strategic work, planning, health, and skill building.',
+    badgeClass: 'badge-q2',
+    icon: 'compass'
+  },
+  {
+    id: 'eisen-q3',
+    title: 'Q3: Urgent — Delegate & Waiting',
+    subtitle: 'Interruptions, delegated items, and on-hold tasks.',
+    badgeClass: 'badge-q3',
+    icon: 'clock'
+  },
+  {
+    id: 'eisen-q4',
+    title: 'Q4: Low Priority — Someday / Eliminate',
+    subtitle: 'Low-value backlog, distractions, and deferred items.',
+    badgeClass: 'badge-q4',
+    icon: 'archive'
+  },
+  {
+    id: 'eisen-inbox',
+    title: 'Inbox — Untriaged Tasks',
+    subtitle: 'Tasks without a priority level assigned yet.',
+    badgeClass: 'badge-inbox',
+    icon: 'inbox'
+  },
+  {
+    id: 'eisen-completed',
+    title: 'Completed Today',
+    subtitle: 'Tasks checked off today.',
+    badgeClass: 'badge-done',
+    icon: 'check-circle'
   }
 ];
 
 export class GTDMatrixView extends ItemView {
   private scanner: VaultScanner;
+  private viewMode: ViewMode = 'gtd';
   private searchQuery = '';
+  private activeChip: 'all' | 'urgent' | 'important' | 'projects' = 'all';
   private selectedFolder = 'all';
   private unsubscribe: (() => void) | null = null;
   private collapsedSections: Set<SectionId> = new Set();
@@ -103,7 +136,6 @@ export class GTDMatrixView extends ItemView {
       });
     }
 
-    // Initial scan
     await this.scanner.scanVault();
     this.render();
   }
@@ -123,7 +155,7 @@ export class GTDMatrixView extends ItemView {
     const tasks = this.scanner.getTasks();
     const todayStr = this.scanner.getTodayDateString();
 
-    // Render Toolbar
+    // Render Toolbar (Mode Switcher, Search, Quick Chips, Folder, Refresh)
     this.renderToolbar(container, tasks);
 
     // Filter Tasks
@@ -141,17 +173,31 @@ export class GTDMatrixView extends ItemView {
         if (!norm.startsWith(this.selectedFolder)) return false;
       }
 
+      // Quick Chips Filter
+      if (this.activeChip === 'urgent') {
+        if (t.priority !== 'highest' && t.priority !== 'medium') return false;
+      } else if (this.activeChip === 'important') {
+        if (t.priority !== 'highest' && t.priority !== 'high') return false;
+      } else if (this.activeChip === 'projects') {
+        if (!t.isProject) return false;
+      }
+
       return true;
     });
 
-    // Group tasks into sections
+    // Group tasks according to active View Mode
+    const activeSections = this.viewMode === 'gtd' ? GTD_SECTIONS : EISENHOWER_SECTIONS;
     const grouped = new Map<SectionId, TaskItem[]>();
-    for (const sec of SECTIONS) {
+    for (const sec of activeSections) {
       grouped.set(sec.id, []);
     }
 
     for (const task of filteredTasks) {
-      const secId = getTaskSection(task, todayStr);
+      const secId =
+        this.viewMode === 'gtd'
+          ? getGTDSection(task, todayStr)
+          : getEisenhowerSection(task, todayStr);
+
       if (secId) {
         grouped.get(secId)?.push(task);
       }
@@ -160,7 +206,7 @@ export class GTDMatrixView extends ItemView {
     // Render Sections List
     const sectionsWrapper = container.createDiv({ cls: 'gtd-sections-wrapper' });
 
-    for (const sec of SECTIONS) {
+    for (const sec of activeSections) {
       const sectionTasks = grouped.get(sec.id) || [];
       this.renderSection(sectionsWrapper, sec, sectionTasks);
     }
@@ -169,18 +215,62 @@ export class GTDMatrixView extends ItemView {
   private renderToolbar(container: HTMLElement, allTasks: TaskItem[]): void {
     const toolbar = container.createDiv({ cls: 'gtd-toolbar' });
 
+    // Mode Switcher Segmented Control
+    const modeGroup = toolbar.createDiv({ cls: 'gtd-mode-switcher' });
+    const gtdBtn = modeGroup.createEl('button', {
+      cls: `gtd-mode-btn ${this.viewMode === 'gtd' ? 'is-active' : ''}`,
+      text: 'GTD Workflow'
+    });
+    gtdBtn.addEventListener('click', () => {
+      if (this.viewMode !== 'gtd') {
+        this.viewMode = 'gtd';
+        this.render();
+      }
+    });
+
+    const eisenBtn = modeGroup.createEl('button', {
+      cls: `gtd-mode-btn ${this.viewMode === 'eisenhower' ? 'is-active' : ''}`,
+      text: 'Eisenhower Matrix'
+    });
+    eisenBtn.addEventListener('click', () => {
+      if (this.viewMode !== 'eisenhower') {
+        this.viewMode = 'eisenhower';
+        this.render();
+      }
+    });
+
     // Search bar
     const searchWrapper = toolbar.createDiv({ cls: 'gtd-search-wrapper' });
     const searchInput = searchWrapper.createEl('input', {
       type: 'text',
       cls: 'gtd-search-input',
-      placeholder: 'Search tasks, tags, or notes...'
+      placeholder: 'Search tasks, tags, projects...'
     });
     searchInput.value = this.searchQuery;
     searchInput.addEventListener('input', () => {
       this.searchQuery = searchInput.value;
       this.render();
     });
+
+    // Quick Filter Chips Row
+    const chipsWrapper = toolbar.createDiv({ cls: 'gtd-chips-wrapper' });
+    const chips: { id: 'all' | 'urgent' | 'important' | 'projects'; label: string }[] = [
+      { id: 'all', label: 'All' },
+      { id: 'urgent', label: 'Urgent' },
+      { id: 'important', label: 'Important' },
+      { id: 'projects', label: 'Projects' }
+    ];
+
+    for (const chip of chips) {
+      const chipBtn = chipsWrapper.createEl('button', {
+        cls: `gtd-chip-btn ${this.activeChip === chip.id ? 'is-active' : ''}`,
+        text: chip.label
+      });
+      chipBtn.addEventListener('click', () => {
+        this.activeChip = chip.id;
+        this.render();
+      });
+    }
 
     // Folder Filter
     const folders = this.getUniqueFolders(allTasks);
@@ -246,18 +336,17 @@ export class GTDMatrixView extends ItemView {
     setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
 
     const titleGroup = headerEl.createDiv({ cls: 'gtd-title-group' });
-    const titleEl = titleGroup.createSpan({ cls: 'gtd-section-title', text: sec.title });
-    const countBadge = titleGroup.createSpan({
+    titleGroup.createSpan({ cls: 'gtd-section-title', text: sec.title });
+    titleGroup.createSpan({
       cls: 'gtd-count-badge',
       text: String(tasks.length)
     });
 
-    const subtitleEl = headerEl.createDiv({
+    headerEl.createDiv({
       cls: 'gtd-section-subtitle',
       text: sec.subtitle
     });
 
-    // Click header to collapse / expand
     headerEl.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).tagName === 'BUTTON') return;
       if (this.collapsedSections.has(sec.id)) {
@@ -304,11 +393,8 @@ export class GTDMatrixView extends ItemView {
           text: 'No tasks here. Drop a task or add one below.'
         });
       } else {
-        // Sort tasks: Due date first, then priority, then note name
         const sorted = [...tasks].sort((a, b) => {
-          if (a.dueDate && b.dueDate) {
-            return a.dueDate.localeCompare(b.dueDate);
-          }
+          if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
           if (a.dueDate && !b.dueDate) return -1;
           if (!a.dueDate && b.dueDate) return 1;
           return a.fileName.localeCompare(b.fileName);
@@ -319,17 +405,15 @@ export class GTDMatrixView extends ItemView {
         }
       }
 
-      // Quick-add input row
       this.renderQuickAddRow(bodyEl, sec.id);
     }
   }
 
   private renderTaskItem(container: HTMLElement, task: TaskItem): void {
     const itemEl = container.createDiv({
-      cls: `gtd-task-item ${task.isCompleted ? 'is-completed' : ''}`
+      cls: `gtd-task-item ${task.isCompleted ? 'is-completed' : ''} ${task.isProject ? 'is-project-task' : ''}`
     });
 
-    // HTML5 Drag and Drop
     itemEl.draggable = true;
     itemEl.addEventListener('dragstart', (e) => {
       if (e.dataTransfer) {
@@ -354,10 +438,10 @@ export class GTDMatrixView extends ItemView {
       await this.scanner.setCompletion(task, checkbox.checked);
     });
 
-    // Priority badge
+    // Priority color pill
     const priorityBtn = itemEl.createEl('button', {
       cls: `gtd-priority-badge priority-${task.priority}`,
-      attr: { 'aria-label': 'Click to change priority' }
+      attr: { 'aria-label': 'Change priority' }
     });
     priorityBtn.setText(this.getPriorityLabel(task.priority));
     priorityBtn.addEventListener('click', (e) => {
@@ -375,7 +459,7 @@ export class GTDMatrixView extends ItemView {
       this.makeEditable(descEl, task);
     });
 
-    // Meta row (Date + Note link)
+    // Meta row (Date + Project badge / Note link)
     const metaEl = itemEl.createDiv({ cls: 'gtd-task-meta' });
 
     // Date pill
@@ -405,10 +489,10 @@ export class GTDMatrixView extends ItemView {
       });
     }
 
-    // Origin note link
+    // Origin note / Project link
     const fileLink = metaEl.createEl('a', {
-      cls: 'gtd-file-link',
-      text: `[[${task.fileName}]]`
+      cls: `gtd-file-link ${task.isProject ? 'is-project-link' : ''}`,
+      text: task.isProject ? `📂 ${task.fileName}` : `[[${task.fileName}]]`
     });
     fileLink.title = `Open ${task.filePath}`;
     fileLink.addEventListener('click', (e) => {
@@ -526,28 +610,56 @@ export class GTDMatrixView extends ItemView {
   }
 
   private async handleTaskDrop(task: TaskItem, targetSection: SectionId): Promise<void> {
+    // GTD Mode Transitions
+    if (this.viewMode === 'gtd') {
+      switch (targetSection) {
+        case 'gtd-next-actions':
+          if (task.isWaiting) await this.scanner.setWaiting(task, false);
+          if (task.isSomeday) await this.scanner.setSomeday(task, false);
+          if (task.priority === 'none' && !task.isProject) {
+            await this.scanner.setPriority(task, 'high');
+          }
+          break;
+        case 'gtd-waiting':
+          await this.scanner.setWaiting(task, true);
+          break;
+        case 'gtd-scheduled':
+          await this.scanner.setDueDate(task, this.scanner.getTodayDateString());
+          break;
+        case 'gtd-someday':
+          await this.scanner.setSomeday(task, true);
+          break;
+        case 'gtd-inbox':
+          await this.scanner.setPriority(task, 'none');
+          await this.scanner.setDueDate(task, null);
+          await this.scanner.setWaiting(task, false);
+          await this.scanner.setSomeday(task, false);
+          break;
+        case 'gtd-completed':
+          await this.scanner.setCompletion(task, true);
+          break;
+      }
+      return;
+    }
+
+    // Eisenhower Mode Transitions
     switch (targetSection) {
-      case 'inbox':
-        await this.scanner.setPriority(task, 'none');
-        break;
-      case 'q1-do':
+      case 'eisen-q1':
         await this.scanner.setPriority(task, 'highest');
         break;
-      case 'q2-schedule':
+      case 'eisen-q2':
         await this.scanner.setPriority(task, 'high');
         break;
-      case 'q3-delegate':
+      case 'eisen-q3':
         await this.scanner.setPriority(task, 'medium');
         break;
-      case 'q4-someday':
+      case 'eisen-q4':
         await this.scanner.setPriority(task, 'low');
         break;
-      case 'scheduled':
-        if (!task.dueDate) {
-          await this.scanner.setDueDate(task, this.scanner.getTodayDateString());
-        }
+      case 'eisen-inbox':
+        await this.scanner.setPriority(task, 'none');
         break;
-      case 'completed-today':
+      case 'eisen-completed':
         await this.scanner.setCompletion(task, true);
         break;
     }

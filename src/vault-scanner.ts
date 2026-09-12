@@ -5,7 +5,9 @@ import {
   setTaskPriority,
   setTaskCompletion,
   setTaskDueDate,
-  setTaskDescription
+  setTaskDescription,
+  setTaskWaiting,
+  setTaskSomeday
 } from './parser';
 
 export class VaultScanner {
@@ -176,27 +178,57 @@ export class VaultScanner {
     );
   }
 
+  public async setWaiting(task: TaskItem, waiting: boolean): Promise<boolean> {
+    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
+      setTaskWaiting(line, waiting)
+    );
+  }
+
+  public async setSomeday(task: TaskItem, someday: boolean): Promise<boolean> {
+    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
+      setTaskSomeday(line, someday)
+    );
+  }
+
   public async quickAddTask(sectionId: SectionId, text: string): Promise<boolean> {
     const dailyPath = this.getDailyNotePath();
     let file = this.app.vault.getAbstractFileByPath(dailyPath);
 
-    // Format initial task line based on section
+    let isWaiting = false;
     let priority: TaskPriority = 'none';
     let extra = '';
 
-    if (sectionId === 'q1-do') {
-      priority = 'highest';
-    } else if (sectionId === 'q2-schedule') {
-      priority = 'high';
-    } else if (sectionId === 'q3-delegate') {
-      priority = 'medium';
-    } else if (sectionId === 'q4-someday') {
-      priority = 'low';
-    } else if (sectionId === 'scheduled') {
-      extra = ` 📅 ${this.getTodayDateString()}`;
+    switch (sectionId) {
+      case 'gtd-next-actions':
+        priority = 'high';
+        break;
+      case 'gtd-waiting':
+        isWaiting = true;
+        break;
+      case 'gtd-scheduled':
+        extra = ` 📅 ${this.getTodayDateString()}`;
+        break;
+      case 'gtd-someday':
+        extra = ' #someday';
+        break;
+      case 'eisen-q1':
+        priority = 'highest';
+        break;
+      case 'eisen-q2':
+        priority = 'high';
+        break;
+      case 'eisen-q3':
+        priority = 'medium';
+        break;
+      case 'eisen-q4':
+        priority = 'low';
+        break;
+      default:
+        break;
     }
 
-    let rawTask = `- [ ] ${text.trim()}${extra}`;
+    const statusBox = isWaiting ? '- [?]' : '- [ ]';
+    let rawTask = `${statusBox} ${text.trim()}${extra}`;
     if (priority !== 'none') {
       rawTask = setTaskPriority(rawTask, priority);
     }
