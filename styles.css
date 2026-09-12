@@ -214,25 +214,58 @@
 
 /* Priority Badge */
 .gtd-priority-badge {
-  font-size: 0.75em;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: none;
+  font-size: 0.76em;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 12px;
+  border: 1px solid transparent;
   cursor: pointer;
-  background: var(--background-secondary-alt);
-  color: var(--text-normal);
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  transition: background-color 0.15s, border-color 0.15s, transform 0.1s;
 }
 
 .gtd-priority-badge:hover {
   filter: brightness(1.15);
+  transform: translateY(-1px);
 }
 
-.priority-highest { background-color: rgba(239, 68, 68, 0.2); color: #ef4444; }
-.priority-high { background-color: rgba(59, 130, 246, 0.2); color: #3b82f6; }
-.priority-medium { background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; }
-.priority-low, .priority-lowest { background-color: rgba(156, 163, 175, 0.2); color: #9ca3af; }
-.priority-none { background-color: var(--background-modifier-border); color: var(--text-faint); }
+.priority-highest {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.priority-high {
+  background-color: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.priority-medium {
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.priority-low,
+.priority-lowest {
+  background-color: rgba(156, 163, 175, 0.12);
+  color: #9ca3af;
+  border-color: rgba(156, 163, 175, 0.35);
+}
+
+.priority-none {
+  background-color: transparent;
+  color: var(--text-faint);
+  border-color: var(--background-modifier-border);
+  border-style: dashed;
+}
+
+.priority-none:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
 
 /* Task Description */
 .gtd-task-desc {

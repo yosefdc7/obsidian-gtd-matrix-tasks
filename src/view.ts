@@ -8,7 +8,7 @@ export const VIEW_TYPE_GTD_MATRIX = 'gtd-matrix-tasks-view';
 const SECTIONS: SectionDefinition[] = [
   {
     id: 'inbox',
-    title: '📥 Inbox — Untriaged Tasks',
+    title: 'Inbox — Untriaged Tasks',
     subtitle: 'Tasks with no priority assigned yet. Triage or prioritize them.',
     badgeClass: 'badge-inbox',
     icon: 'inbox',
@@ -16,31 +16,31 @@ const SECTIONS: SectionDefinition[] = [
   },
   {
     id: 'q1-do',
-    title: '🔴 Q1: Urgent & Important — Do First',
-    subtitle: 'Crises, deadlines, and highest-impact commitments (⏫).',
+    title: 'Q1: Urgent & Important — Do First',
+    subtitle: 'Crises, deadlines, and highest-impact commitments.',
     badgeClass: 'badge-q1',
     icon: 'alert-triangle',
     targetPriority: 'highest'
   },
   {
     id: 'q2-schedule',
-    title: '🔵 Q2: Important, Not Urgent — Schedule & Focus',
-    subtitle: 'Strategic goals, deep work, health, and skill building (🔼).',
+    title: 'Q2: Important — Schedule & Focus',
+    subtitle: 'Strategic goals, deep work, health, and skill building.',
     badgeClass: 'badge-q2',
     icon: 'compass',
     targetPriority: 'high'
   },
   {
     id: 'q3-delegate',
-    title: '🟡 Q3: Urgent, Not Important — Delegate & Waiting',
-    subtitle: 'Blocked or delegated tasks (🔽 or On Hold [?]).',
+    title: 'Q3: Urgent — Delegate & Waiting',
+    subtitle: 'Blocked or delegated tasks.',
     badgeClass: 'badge-q3',
     icon: 'clock',
     targetPriority: 'medium'
   },
   {
     id: 'scheduled',
-    title: '📅 Scheduled & Due This Week',
+    title: 'Scheduled & Due This Week',
     subtitle: 'Tasks with due or scheduled dates within the next 7 days.',
     badgeClass: 'badge-scheduled',
     icon: 'calendar',
@@ -48,15 +48,15 @@ const SECTIONS: SectionDefinition[] = [
   },
   {
     id: 'q4-someday',
-    title: '⚪ Q4: Not Urgent & Not Important — Someday / Maybe',
-    subtitle: 'Low-priority backlog, deferred reading, or ideas (⏬).',
+    title: 'Q4: Low Priority — Someday / Maybe',
+    subtitle: 'Low-priority backlog, deferred reading, or ideas.',
     badgeClass: 'badge-q4',
     icon: 'archive',
     targetPriority: 'low'
   },
   {
     id: 'completed-today',
-    title: '✅ Log — Completed Today',
+    title: 'Completed Today',
     subtitle: 'Tasks checked off today. Keep up the momentum!',
     badgeClass: 'badge-done',
     icon: 'check-circle',
@@ -475,11 +475,11 @@ export class GTDMatrixView extends ItemView {
   private showPriorityMenu(e: MouseEvent, task: TaskItem): void {
     const menu = new Menu();
     const priorities: { prio: TaskPriority; label: string }[] = [
-      { prio: 'highest', label: '🔺 Highest (Q1 Do)' },
-      { prio: 'high', label: '⏫ High (Q2 Schedule)' },
-      { prio: 'medium', label: '🔼 Medium (Q3 Delegate)' },
-      { prio: 'low', label: '🔽 Low (Q4 Someday)' },
-      { prio: 'none', label: '⚪ None (Inbox)' }
+      { prio: 'highest', label: 'Urgent & Important (Q1)' },
+      { prio: 'high', label: 'Important (Q2)' },
+      { prio: 'medium', label: 'Urgent (Q3)' },
+      { prio: 'low', label: 'Low Priority (Q4)' },
+      { prio: 'none', label: 'Untriaged (Inbox)' }
     ];
 
     for (const p of priorities) {
@@ -556,16 +556,16 @@ export class GTDMatrixView extends ItemView {
   private getPriorityLabel(prio: TaskPriority): string {
     switch (prio) {
       case 'highest':
-        return '⏫ Q1';
+        return 'Urgent · Important';
       case 'high':
-        return '🔼 Q2';
+        return 'Important';
       case 'medium':
-        return '🔽 Q3';
+        return 'Urgent';
       case 'low':
       case 'lowest':
-        return '⏬ Q4';
+        return 'Low Priority';
       default:
-        return '⚪';
+        return '+ Priority';
     }
   }
 }
