@@ -4,6 +4,7 @@ import {
   setTaskPriority,
   setTaskCompletion,
   setTaskDueDate,
+  setTaskScheduledDate,
   setTaskDescription,
   setTaskWaiting,
   setTaskSomeday,
@@ -69,6 +70,18 @@ describe('Task Mutators', () => {
     const restored = setTaskSomeday(someday, false);
     expect(restored).toBe('- [ ] Learn surfing');
   });
+
+  it('sets and clears scheduled date on task line', () => {
+    const line = '- [ ] Prepare quarterly review';
+    const scheduled = setTaskScheduledDate(line, '2026-09-20');
+    expect(scheduled).toBe('- [ ] Prepare quarterly review ⏳ 2026-09-20');
+
+    const updated = setTaskScheduledDate(scheduled, '2026-09-25');
+    expect(updated).toBe('- [ ] Prepare quarterly review ⏳ 2026-09-25');
+
+    const cleared = setTaskScheduledDate(updated, null);
+    expect(cleared).toBe('- [ ] Prepare quarterly review');
+  });
 });
 
 describe('Section Routing', () => {
@@ -111,6 +124,7 @@ describe('Section Routing', () => {
 
     it('routes scheduled tasks to Scheduled', () => {
       expect(getGTDSection({ ...baseTask, dueDate: '2026-09-15' }, today)).toBe('gtd-scheduled');
+      expect(getGTDSection({ ...baseTask, scheduledDate: '2026-09-15' }, today)).toBe('gtd-scheduled');
     });
 
     it('routes someday tasks to Someday / Maybe', () => {

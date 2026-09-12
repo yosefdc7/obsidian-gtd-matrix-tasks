@@ -5,6 +5,7 @@ import {
   setTaskPriority,
   setTaskCompletion,
   setTaskDueDate,
+  setTaskScheduledDate,
   setTaskDescription,
   setTaskWaiting,
   setTaskSomeday
@@ -172,6 +173,12 @@ export class VaultScanner {
     );
   }
 
+  public async setScheduledDate(task: TaskItem, scheduledDate: string | null): Promise<boolean> {
+    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
+      setTaskScheduledDate(line, scheduledDate)
+    );
+  }
+
   public async setDescription(task: TaskItem, newDescription: string): Promise<boolean> {
     return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
       setTaskDescription(line, newDescription)
@@ -206,7 +213,7 @@ export class VaultScanner {
         isWaiting = true;
         break;
       case 'gtd-scheduled':
-        extra = ` 📅 ${this.getTodayDateString()}`;
+        extra = ` ⏳ ${this.getTodayDateString()}`;
         break;
       case 'gtd-someday':
         extra = ' #someday';

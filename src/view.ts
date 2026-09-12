@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, setIcon, Menu } from 'obsidian';
+import { ItemView, WorkspaceLeaf, setIcon, Menu, MarkdownRenderer } from 'obsidian';
 import { VaultScanner } from './vault-scanner';
 import { TaskItem, TaskPriority, SectionId, SectionDefinition, ViewMode } from './types';
 import { getGTDSection, getEisenhowerSection } from './parser';
@@ -394,9 +394,11 @@ export class GTDMatrixView extends ItemView {
         });
       } else {
         const sorted = [...tasks].sort((a, b) => {
-          if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
-          if (a.dueDate && !b.dueDate) return -1;
-          if (!a.dueDate && b.dueDate) return 1;
+          const dateA = a.scheduledDate || a.dueDate;
+          const dateB = b.scheduledDate || b.dueDate;
+          if (dateA && dateB) return dateA.localeCompare(dateB);
+          if (dateA && !dateB) return -1;
+          if (!dateA && dateB) return 1;
           return a.fileName.localeCompare(b.fileName);
         });
 
@@ -449,43 +451,78 @@ export class GTDMatrixView extends ItemView {
       this.showPriorityMenu(e, task);
     });
 
-    // Description (inline editable)
+    // Description (rendered markdown with smart click routing)
     const descEl = itemEl.createDiv({ cls: 'gtd-task-desc' });
-    descEl.setText(task.description || '(No description)');
-    descEl.title = 'Click to edit description';
+    if (task.description) {
+      void MarkdownRenderer.render(this.app, task.description, descEl, task.filePath, this);
+    } else {
+      descEl.setText('(No description)');
+    }
+    descEl.title = 'Click to edit description (or click links to open)';
 
     descEl.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('a') || target.classList.contains('internal-link') || target.classList.contains('external-link')) {
+        return; // Let Obsidian handle navigation
+      }
       e.stopPropagation();
       this.makeEditable(descEl, task);
     });
 
-    // Meta row (Date + Project badge / Note link)
-    const metaEl = itemEl.createDiv({ cls: 'gtd-task-meta' });
+    // Edit button on hover
+    const editBtn = itemEl.createEl('button', {
+      cls: 'gtd-edit-btn',
+      attr: { 'aria-label': 'Edit task text' }
+    });
+    setIcon(editBtn, 'pencil');
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.makeEditable(descEl, task);
+    });
 
-    // Date pill
+    // Meta row (Scheduled Date + Due Date + Project badge / Note link)
+    const metaEl = itemEl.createDiv({ cls: 'gtd-task-meta' });
+    const today = this.scanner.getTodayDateString();
+
+    // 1. Scheduled Date Pill (⏳ Primary)
+    if (task.scheduledDate) {
+      const isOverdue = !task.isCompleted && task.scheduledDate < today;
+      const isToday = task.scheduledDate === today;
+
+      const schedPill = metaEl.createEl('button', {
+        cls: `gtd-date-pill gtd-date-scheduled ${isOverdue ? 'is-overdue' : ''} ${isToday ? 'is-today' : ''}`,
+        text: `⏳ ${task.scheduledDate}`
+      });
+      schedPill.title = 'Click to change scheduled date';
+      schedPill.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showScheduledDatePicker(schedPill, task);
+      });
+    } else {
+      const addSchedBtn = metaEl.createEl('button', {
+        cls: 'gtd-date-pill gtd-date-add',
+        text: '+ Scheduled'
+      });
+      addSchedBtn.title = 'Add scheduled date (⏳)';
+      addSchedBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showScheduledDatePicker(addSchedBtn, task);
+      });
+    }
+
+    // 2. Due Date Pill (📅 if present)
     if (task.dueDate) {
-      const today = this.scanner.getTodayDateString();
       const isOverdue = !task.isCompleted && task.dueDate < today;
       const isToday = task.dueDate === today;
 
-      const datePill = metaEl.createEl('button', {
-        cls: `gtd-date-pill ${isOverdue ? 'is-overdue' : ''} ${isToday ? 'is-today' : ''}`,
+      const duePill = metaEl.createEl('button', {
+        cls: `gtd-date-pill gtd-date-due ${isOverdue ? 'is-overdue' : ''} ${isToday ? 'is-today' : ''}`,
         text: `📅 ${task.dueDate}`
       });
-      datePill.title = 'Click to change due date';
-      datePill.addEventListener('click', (e) => {
+      duePill.title = 'Click to change due date';
+      duePill.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.showDatePicker(datePill, task);
-      });
-    } else {
-      const addDateBtn = metaEl.createEl('button', {
-        cls: 'gtd-date-pill gtd-date-add',
-        text: '+ Date'
-      });
-      addDateBtn.title = 'Add due date';
-      addDateBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.showDatePicker(addDateBtn, task);
+        this.showDueDatePicker(duePill, task);
       });
     }
 
@@ -520,6 +557,8 @@ export class GTDMatrixView extends ItemView {
   }
 
   private makeEditable(descEl: HTMLElement, task: TaskItem): void {
+    if (descEl.querySelector('input')) return;
+
     const originalText = task.description;
     const input = createEl('input', {
       type: 'text',
@@ -527,7 +566,7 @@ export class GTDMatrixView extends ItemView {
       value: originalText
     });
 
-    descEl.empty();
+    descEl.innerHTML = '';
     descEl.appendChild(input);
     input.focus();
     input.select();
@@ -540,7 +579,12 @@ export class GTDMatrixView extends ItemView {
       if (newText && newText !== originalText) {
         await this.scanner.setDescription(task, newText);
       } else {
-        descEl.setText(originalText);
+        descEl.innerHTML = '';
+        if (originalText) {
+          void MarkdownRenderer.render(this.app, originalText, descEl, task.filePath, this);
+        } else {
+          descEl.setText('(No description)');
+        }
       }
     };
 
@@ -549,7 +593,12 @@ export class GTDMatrixView extends ItemView {
         save();
       } else if (e.key === 'Escape') {
         committed = true;
-        descEl.setText(originalText);
+        descEl.innerHTML = '';
+        if (originalText) {
+          void MarkdownRenderer.render(this.app, originalText, descEl, task.filePath, this);
+        } else {
+          descEl.setText('(No description)');
+        }
       }
     });
 
@@ -577,7 +626,39 @@ export class GTDMatrixView extends ItemView {
     menu.showAtMouseEvent(e);
   }
 
-  private showDatePicker(anchor: HTMLElement, task: TaskItem): void {
+  private showScheduledDatePicker(anchor: HTMLElement, task: TaskItem): void {
+    const popover = createDiv({ cls: 'gtd-date-popover' });
+    const dateInput = popover.createEl('input', {
+      type: 'date',
+      cls: 'gtd-date-input',
+      value: task.scheduledDate || this.scanner.getTodayDateString()
+    });
+
+    const clearBtn = popover.createEl('button', {
+      cls: 'gtd-btn-sm',
+      text: 'Clear'
+    });
+
+    anchor.parentElement?.appendChild(popover);
+    dateInput.focus();
+
+    dateInput.addEventListener('change', async () => {
+      await this.scanner.setScheduledDate(task, dateInput.value || null);
+      popover.remove();
+    });
+
+    clearBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await this.scanner.setScheduledDate(task, null);
+      popover.remove();
+    });
+
+    popover.addEventListener('mouseleave', () => {
+      popover.remove();
+    });
+  }
+
+  private showDueDatePicker(anchor: HTMLElement, task: TaskItem): void {
     const popover = createDiv({ cls: 'gtd-date-popover' });
     const dateInput = popover.createEl('input', {
       type: 'date',
@@ -624,7 +705,7 @@ export class GTDMatrixView extends ItemView {
           await this.scanner.setWaiting(task, true);
           break;
         case 'gtd-scheduled':
-          await this.scanner.setDueDate(task, this.scanner.getTodayDateString());
+          await this.scanner.setScheduledDate(task, this.scanner.getTodayDateString());
           break;
         case 'gtd-someday':
           await this.scanner.setSomeday(task, true);
@@ -632,6 +713,7 @@ export class GTDMatrixView extends ItemView {
         case 'gtd-inbox':
           await this.scanner.setPriority(task, 'none');
           await this.scanner.setDueDate(task, null);
+          await this.scanner.setScheduledDate(task, null);
           await this.scanner.setWaiting(task, false);
           await this.scanner.setSomeday(task, false);
           break;
