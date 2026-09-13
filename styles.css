@@ -520,3 +520,14 @@
   border-color: var(--interactive-accent);
   background: var(--background-primary);
 }
+
+/* ==========================================================================
+   Folder-Specific Note Styling: Hide Properties in Jots
+   ========================================================================== */
+.is-in-jots .metadata-container,
+.is-in-jots .metadata-properties,
+.is-in-jots .cm-embed-block:has(.metadata-container),
+.is-in-jots .cm-embed-block:has(.metadata-properties) {
+  display: none !important;
+}
+

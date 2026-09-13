@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf } from 'obsidian';
+import { Plugin, WorkspaceLeaf, MarkdownView } from 'obsidian';
 import { VaultScanner } from './vault-scanner';
 import { GTDMatrixView, VIEW_TYPE_GTD_MATRIX } from './view';
 import { PluginSettings, DEFAULT_SETTINGS } from './types';
@@ -29,6 +29,21 @@ export default class GTDMatrixPlugin extends Plugin {
       }
     });
 
+    // Folder-based note styling listeners (hide properties in Jots)
+    this.registerEvent(
+      this.app.workspace.on('file-open', () => {
+        this.updateLeafFolderClasses();
+      })
+    );
+    this.registerEvent(
+      this.app.workspace.on('layout-change', () => {
+        this.updateLeafFolderClasses();
+      })
+    );
+    this.app.workspace.onLayoutReady(() => {
+      this.updateLeafFolderClasses();
+    });
+
     // Vault change listeners for live updates
     this.registerEvent(
       this.app.vault.on('modify', () => {
@@ -50,6 +65,35 @@ export default class GTDMatrixPlugin extends Plugin {
         this.scanner.debouncedScan();
       })
     );
+  }
+
+  private updateLeafFolderClasses(): void {
+    this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      const state = leaf.getViewState();
+      if (state?.type === 'markdown' || leaf.view instanceof MarkdownView) {
+        const filePath = (leaf.view as any)?.file?.path || (state?.state as any)?.file || '';
+        const isInJots = typeof filePath === 'string' && filePath.startsWith('Jots/');
+        const containerEl = (leaf as unknown as { containerEl?: HTMLElement }).containerEl;
+        const viewContainerEl = leaf.view?.containerEl;
+
+        if (isInJots) {
+          containerEl?.addClass('is-in-jots');
+          viewContainerEl?.addClass('is-in-jots');
+        } else {
+          containerEl?.removeClass('is-in-jots');
+          viewContainerEl?.removeClass('is-in-jots');
+        }
+      }
+    });
+  }
+
+  onunload(): void {
+    this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
+      if (leaf.view instanceof MarkdownView) {
+        leaf.view.containerEl.removeClass('is-in-jots');
+      }
+      (leaf as unknown as { containerEl?: HTMLElement }).containerEl?.removeClass('is-in-jots');
+    });
   }
 
   async activateView(): Promise<void> {
