@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, setIcon, Menu, MarkdownRenderer } from 'obsidian';
 import { VaultScanner } from './vault-scanner';
-import { TaskItem, TaskPriority, SectionId, SectionDefinition, ViewMode } from './types';
+import { TaskItem, TaskPriority, SectionId, SectionDefinition, ViewMode, LayoutMode, PluginSettings } from './types';
 import { getGTDSection, getEisenhowerSection } from './parser';
 
 export const VIEW_TYPE_GTD_MATRIX = 'gtd-matrix-tasks-view';
@@ -98,15 +98,20 @@ const EISENHOWER_SECTIONS: SectionDefinition[] = [
 export class GTDMatrixView extends ItemView {
   private scanner: VaultScanner;
   private viewMode: ViewMode = 'gtd';
+  private layoutMode: LayoutMode = 'board';
   private searchQuery = '';
   private activeChip: 'all' | 'urgent' | 'important' | 'projects' = 'all';
   private selectedFolder = 'all';
   private unsubscribe: (() => void) | null = null;
   private collapsedSections: Set<SectionId> = new Set();
 
-  constructor(leaf: WorkspaceLeaf, scanner: VaultScanner) {
+  constructor(leaf: WorkspaceLeaf, scanner: VaultScanner, settings?: PluginSettings) {
     super(leaf);
     this.scanner = scanner;
+    if (settings) {
+      this.layoutMode = settings.defaultLayoutMode;
+      this.viewMode = settings.defaultViewMode;
+    }
   }
 
   getViewType(): string {
@@ -126,7 +131,11 @@ export class GTDMatrixView extends ItemView {
     this.unsubscribe = this.scanner.onTasksUpdated(() => {
       this.render();
     });
-    void this.scanner.scanVault().then(() => this.render());
+    if (this.scanner.getTasks().length === 0) {
+      void this.scanner.scanVault().then(() => this.render());
+    } else {
+      this.render();
+    }
   }
 
   async onOpen(): Promise<void> {
@@ -136,7 +145,9 @@ export class GTDMatrixView extends ItemView {
       });
     }
 
-    await this.scanner.scanVault();
+    if (this.scanner.getTasks().length === 0) {
+      await this.scanner.scanVault();
+    }
     this.render();
   }
 
@@ -155,7 +166,7 @@ export class GTDMatrixView extends ItemView {
     const tasks = this.scanner.getTasks();
     const todayStr = this.scanner.getTodayDateString();
 
-    // Render Toolbar (Mode Switcher, Search, Quick Chips, Folder, Refresh)
+    // Render Toolbar (Mode Switcher, Layout Toggle, Search, Quick Chips, Folder, Refresh)
     this.renderToolbar(container, tasks);
 
     // Filter Tasks
@@ -203,12 +214,15 @@ export class GTDMatrixView extends ItemView {
       }
     }
 
-    // Render Sections List
-    const sectionsWrapper = container.createDiv({ cls: 'gtd-sections-wrapper' });
-
-    for (const sec of activeSections) {
-      const sectionTasks = grouped.get(sec.id) || [];
-      this.renderSection(sectionsWrapper, sec, sectionTasks);
+    // Render Board or List
+    if (this.layoutMode === 'board') {
+      this.renderBoard(container, activeSections, grouped);
+    } else {
+      const sectionsWrapper = container.createDiv({ cls: 'gtd-sections-wrapper' });
+      for (const sec of activeSections) {
+        const sectionTasks = grouped.get(sec.id) || [];
+        this.renderSection(sectionsWrapper, sec, sectionTasks);
+      }
     }
   }
 
@@ -235,6 +249,31 @@ export class GTDMatrixView extends ItemView {
     eisenBtn.addEventListener('click', () => {
       if (this.viewMode !== 'eisenhower') {
         this.viewMode = 'eisenhower';
+        this.render();
+      }
+    });
+
+    // Layout Toggle (Board / List)
+    const layoutGroup = toolbar.createDiv({ cls: 'gtd-layout-switcher' });
+    const boardBtn = layoutGroup.createEl('button', {
+      cls: `gtd-layout-btn ${this.layoutMode === 'board' ? 'is-active' : ''}`,
+      attr: { 'aria-label': 'Board view' }
+    });
+    setIcon(boardBtn, 'layout-dashboard');
+    boardBtn.addEventListener('click', () => {
+      if (this.layoutMode !== 'board') {
+        this.layoutMode = 'board';
+        this.render();
+      }
+    });
+    const listBtn = layoutGroup.createEl('button', {
+      cls: `gtd-layout-btn ${this.layoutMode === 'list' ? 'is-active' : ''}`,
+      attr: { 'aria-label': 'List view' }
+    });
+    setIcon(listBtn, 'list');
+    listBtn.addEventListener('click', () => {
+      if (this.layoutMode !== 'list') {
+        this.layoutMode = 'list';
         this.render();
       }
     });
@@ -317,6 +356,154 @@ export class GTDMatrixView extends ItemView {
       }
     }
     return Array.from(set).sort();
+  }
+
+  private renderBoard(
+    container: HTMLElement,
+    sections: SectionDefinition[],
+    grouped: Map<SectionId, TaskItem[]>
+  ): void {
+    const board = container.createDiv({ cls: 'gtd-board' });
+
+    for (const sec of sections) {
+      const colTasks = grouped.get(sec.id) || [];
+      const col = board.createDiv({ cls: `gtd-board-column ${sec.badgeClass}` });
+
+      // Column header
+      const colHeader = col.createDiv({ cls: 'gtd-board-col-header' });
+      const iconSpan = colHeader.createSpan({ cls: 'gtd-board-col-icon' });
+      setIcon(iconSpan, sec.icon);
+      colHeader.createSpan({ cls: 'gtd-board-col-title', text: sec.title });
+      colHeader.createSpan({ cls: 'gtd-count-badge', text: String(colTasks.length) });
+
+      // Drop zone
+      const dropZone = col.createDiv({ cls: 'gtd-board-drop-zone' });
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        dropZone.addClass('gtd-drag-over');
+      });
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.removeClass('gtd-drag-over');
+      });
+      dropZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        dropZone.removeClass('gtd-drag-over');
+        const taskId = e.dataTransfer?.getData('text/plain');
+        if (!taskId) return;
+        const task = this.scanner.getTasks().find((t) => t.id === taskId);
+        if (!task) return;
+        await this.handleTaskDrop(task, sec.id);
+      });
+
+      // Sort tasks
+      const sorted = [...colTasks].sort((a, b) => {
+        const dateA = a.scheduledDate || a.dueDate;
+        const dateB = b.scheduledDate || b.dueDate;
+        if (dateA && dateB) return dateA.localeCompare(dateB);
+        if (dateA && !dateB) return -1;
+        if (!dateA && dateB) return 1;
+        return a.fileName.localeCompare(b.fileName);
+      });
+
+      if (sorted.length === 0) {
+        dropZone.createDiv({ cls: 'gtd-board-empty', text: 'Drop a task here' });
+      } else {
+        for (const task of sorted) {
+          this.renderBoardCard(dropZone, task);
+        }
+      }
+
+      // Quick-add inside board column
+      this.renderQuickAddRow(col, sec.id);
+    }
+  }
+
+  private renderBoardCard(container: HTMLElement, task: TaskItem): void {
+    const today = this.scanner.getTodayDateString();
+    const card = container.createDiv({
+      cls: `gtd-board-card ${task.isCompleted ? 'is-completed' : ''} ${task.isProject ? 'is-project-task' : ''}`
+    });
+
+    card.draggable = true;
+    card.addEventListener('dragstart', (e) => {
+      if (e.dataTransfer) {
+        e.dataTransfer.setData('text/plain', task.id);
+        e.dataTransfer.effectAllowed = 'move';
+      }
+      card.addClass('is-dragging');
+    });
+    card.addEventListener('dragend', () => card.removeClass('is-dragging'));
+
+    // Top row: checkbox + priority badge
+    const topRow = card.createDiv({ cls: 'gtd-board-card-top' });
+    const checkbox = topRow.createEl('input', { type: 'checkbox', cls: 'gtd-checkbox' });
+    checkbox.checked = task.isCompleted;
+    checkbox.addEventListener('change', async (e) => {
+      e.stopPropagation();
+      await this.scanner.setCompletion(task, checkbox.checked);
+    });
+
+    const priorityBtn = topRow.createEl('button', {
+      cls: `gtd-priority-badge priority-${task.priority}`,
+      attr: { 'aria-label': 'Change priority' }
+    });
+    priorityBtn.setText(this.getPriorityLabel(task.priority));
+    priorityBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showPriorityMenu(e, task);
+    });
+
+    // Description
+    const descEl = card.createDiv({ cls: 'gtd-board-card-desc' });
+    if (task.description) {
+      void MarkdownRenderer.render(this.app, task.description, descEl, task.filePath, this);
+    } else {
+      descEl.setText('(No description)');
+    }
+    descEl.addEventListener('click', (e) => {
+      const anchor = (e.target as HTMLElement).closest('a');
+      if (anchor) {
+        e.preventDefault();
+        e.stopPropagation();
+        const href = anchor.getAttribute('data-href') || anchor.getAttribute('href');
+        if (!href) return;
+        const isExternal = /^(https?:|\/\/)/.test(href);
+        if (isExternal) window.open(href, '_blank');
+        else void this.app.workspace.openLinkText(href, task.filePath, 'tab');
+        return;
+      }
+      e.stopPropagation();
+      this.makeEditable(descEl, task);
+    });
+
+    // Meta row: dates + source file
+    const metaEl = card.createDiv({ cls: 'gtd-board-card-meta' });
+
+    if (task.scheduledDate) {
+      const isOverdue = !task.isCompleted && task.scheduledDate < today;
+      metaEl.createEl('button', {
+        cls: `gtd-date-pill gtd-date-scheduled ${isOverdue ? 'is-overdue' : ''}`,
+        text: `⏳ ${task.scheduledDate}`
+      }).addEventListener('click', (e) => { e.stopPropagation(); this.showScheduledDatePicker(e.target as HTMLElement, task); });
+    }
+    if (task.dueDate) {
+      const isOverdue = !task.isCompleted && task.dueDate < today;
+      metaEl.createEl('button', {
+        cls: `gtd-date-pill gtd-date-due ${isOverdue ? 'is-overdue' : ''}`,
+        text: `📅 ${task.dueDate}`
+      }).addEventListener('click', (e) => { e.stopPropagation(); this.showDueDatePicker(e.target as HTMLElement, task); });
+    }
+
+    const fileLink = metaEl.createEl('a', {
+      cls: `gtd-file-link ${task.isProject ? 'is-project-link' : ''}`,
+      text: task.isProject ? `📂 ${task.fileName}` : `[[${task.fileName}]]`
+    });
+    fileLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      void this.app.workspace.openLinkText(task.filePath, '', 'tab');
+    });
   }
 
   private renderSection(
@@ -739,24 +926,36 @@ export class GTDMatrixView extends ItemView {
   }
 
   private async handleTaskDrop(task: TaskItem, targetSection: SectionId): Promise<void> {
+    const dateOffset = (days: number): string => {
+      const d = new Date(this.scanner.getTodayDateString());
+      d.setDate(d.getDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
+
     // GTD Mode Transitions
     if (this.viewMode === 'gtd') {
       switch (targetSection) {
         case 'gtd-next-actions':
+          // Clear waiting/someday flags, set dueDate = today+3
           if (task.isWaiting) await this.scanner.setWaiting(task, false);
           if (task.isSomeday) await this.scanner.setSomeday(task, false);
-          if (task.priority === 'none' && !task.isProject) {
-            await this.scanner.setPriority(task, 'high');
-          }
+          await this.scanner.setDueDate(task, dateOffset(3));
           break;
         case 'gtd-waiting':
+          // Add #waiting tag (setWaiting handles the statusChar '?' approach)
           await this.scanner.setWaiting(task, true);
           break;
         case 'gtd-scheduled':
-          await this.scanner.setScheduledDate(task, this.scanner.getTodayDateString());
+          // Set scheduledDate = today+10
+          if (task.isWaiting) await this.scanner.setWaiting(task, false);
+          if (task.isSomeday) await this.scanner.setSomeday(task, false);
+          await this.scanner.setScheduledDate(task, dateOffset(10));
           break;
         case 'gtd-someday':
+          // Add #someday tag, clear dates
           await this.scanner.setSomeday(task, true);
+          await this.scanner.setDueDate(task, null);
+          await this.scanner.setScheduledDate(task, null);
           break;
         case 'gtd-inbox':
           await this.scanner.setPriority(task, 'none');
@@ -794,6 +993,7 @@ export class GTDMatrixView extends ItemView {
         break;
     }
   }
+
 
   private getPriorityLabel(prio: TaskPriority): string {
     switch (prio) {

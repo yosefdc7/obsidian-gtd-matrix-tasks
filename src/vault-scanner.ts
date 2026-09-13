@@ -17,11 +17,13 @@ export class VaultScanner {
   private tasks: TaskItem[] = [];
   private listeners: ((tasks: TaskItem[]) => void)[] = [];
   public debouncedScan: () => void;
+  public debouncedNotify: () => void;
 
   constructor(app: App, settings: PluginSettings) {
     this.app = app;
     this.settings = settings;
-    this.debouncedScan = debounce(() => this.scanVault(), 300, true);
+    this.debouncedScan = debounce(() => this.scanVault(), 2000, false);
+    this.debouncedNotify = debounce(() => this.notify(), 150, false);
   }
 
   public onTasksUpdated(callback: (tasks: TaskItem[]) => void): () => void {
@@ -106,6 +108,68 @@ export class VaultScanner {
     return this.tasks;
   }
 
+  public async reindexFile(file: TFile): Promise<void> {
+    if (!file || file.extension !== 'md') return;
+
+    if (this.isExcluded(file.path)) {
+      const prevCount = this.tasks.length;
+      this.tasks = this.tasks.filter((t) => t.filePath !== file.path);
+      if (this.tasks.length !== prevCount) {
+        this.debouncedNotify();
+      }
+      return;
+    }
+
+    const cache = this.app.metadataCache.getFileCache(file);
+    const fileTasks: TaskItem[] = [];
+
+    // Only read file if it contains list items / tasks or cache is not ready
+    if (!cache || (cache.listItems && cache.listItems.some((i) => i.task !== undefined))) {
+      try {
+        const content = await this.app.vault.cachedRead(file);
+        const lines = content.split('\n');
+
+        if (cache?.listItems) {
+          for (const item of cache.listItems) {
+            if (item.task !== undefined) {
+              const lineIdx = item.position.start.line;
+              if (lineIdx < lines.length) {
+                const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
+                if (task) fileTasks.push(task);
+              }
+            }
+          }
+        } else {
+          for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+            const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
+            if (task) fileTasks.push(task);
+          }
+        }
+      } catch (err) {
+        console.error(`Error reindexing ${file.path} in GTD Matrix Tasks:`, err);
+        return;
+      }
+    }
+
+    // Atomically replace tasks for this file
+    const otherTasks = this.tasks.filter((t) => t.filePath !== file.path);
+    this.tasks = otherTasks.concat(fileTasks);
+    this.debouncedNotify();
+  }
+
+  public handleFileDelete(filePath: string): void {
+    const prevCount = this.tasks.length;
+    this.tasks = this.tasks.filter((t) => t.filePath !== filePath);
+    if (this.tasks.length !== prevCount) {
+      this.debouncedNotify();
+    }
+  }
+
+  public async handleFileRename(newFile: TFile, oldPath: string): Promise<void> {
+    this.handleFileDelete(oldPath);
+    await this.reindexFile(newFile);
+  }
+
   public async updateTaskLine(
     filePath: string,
     lineNumber: number,
@@ -145,8 +209,8 @@ export class VaultScanner {
         return lines.join('\n');
       });
 
-      // Quick re-scan
-      this.debouncedScan();
+      // Incremental re-index of the modified file
+      await this.reindexFile(abstractFile);
       return true;
     } catch (err) {
       console.error(`Failed to update task in ${filePath}:`, err);
@@ -256,7 +320,7 @@ export class VaultScanner {
       });
     }
 
-    this.debouncedScan();
+    await this.reindexFile(file as TFile);
     return true;
   }
 

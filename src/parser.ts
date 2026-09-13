@@ -9,7 +9,7 @@ const PRIORITY_EMOJI_REGEX = /[⏫🔺🔼🔽⏬]/gu;
 const EISEN_TAG_REGEX = /#eisen\/[a-zA-Z0-9_-]+/g;
 const TAG_REGEX = /#[a-zA-Z0-9_/-]+/g;
 const SOMEDAY_REGEX = /#(someday|maybe)\b/i;
-const WAITING_REGEX = /#waiting\b|@waiting\b|\bwaiting on\b/i;
+const WAITING_REGEX = /#waiting\b|@waiting\b|\bwaiting on\b|#blocked\b|#on-hold\b|#onhold\b/i;
 
 export function parseTaskLine(line: string, filePath: string, lineNumber: number): TaskItem | null {
   const match = line.match(TASK_REGEX);
@@ -206,26 +206,45 @@ export function getGTDSection(task: TaskItem, todayStr: string): GTDSectionId | 
     return null; // Omit older completed tasks
   }
 
+  // 1. Waiting For: statusChar='?' OR #waiting/#blocked/#on-hold tags
   if (task.isWaiting) {
     return 'gtd-waiting';
   }
 
-  if (task.isSomeday) {
+  // Build a helper: how many days from today is a date string?
+  const daysDiff = (dateStr: string): number => {
+    const todayMs = new Date(todayStr).getTime();
+    const targetMs = new Date(dateStr).getTime();
+    return Math.round((targetMs - todayMs) / 86400000);
+  };
+
+  // Use the earliest of dueDate / scheduledDate / startDate
+  const relevantDate = task.dueDate || task.scheduledDate || task.startDate;
+
+  // 2. Someday: explicit #someday/#maybe tag OR date is more than 90 days away
+  if (task.isSomeday || (relevantDate && daysDiff(relevantDate) > 90)) {
     return 'gtd-someday';
   }
 
-  if (task.dueDate || task.scheduledDate) {
+  // 3. Next Actions: date within 0–3 days from today (overdue counts as next action)
+  if (relevantDate && daysDiff(relevantDate) <= 3) {
+    return 'gtd-next-actions';
+  }
+
+  // 4. Scheduled: date 4–90 days from today
+  if (relevantDate && daysDiff(relevantDate) <= 90) {
     return 'gtd-scheduled';
   }
 
-  // Next Actions: Prioritized tasks or tasks belonging to an active project
+  // 5. Tasks with priority or #next tag but no date → Next Actions
   if (task.priority !== 'none' || task.isProject || task.tags.includes('#next')) {
     return 'gtd-next-actions';
   }
 
-  // Raw unprocessed capture tasks
+  // 6. Raw unprocessed capture
   return 'gtd-inbox';
 }
+
 
 export function getEisenhowerSection(task: TaskItem, todayStr: string): EisenhowerSectionId | null {
   if (task.isCompleted) {

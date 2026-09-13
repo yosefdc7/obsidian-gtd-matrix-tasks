@@ -1,6 +1,7 @@
 export type TaskPriority = 'highest' | 'high' | 'medium' | 'low' | 'lowest' | 'none';
 
 export type ViewMode = 'gtd' | 'eisenhower';
+export type LayoutMode = 'board' | 'list';
 
 export type GTDSectionId =
   | 'gtd-inbox'
@@ -55,6 +56,7 @@ export interface PluginSettings {
   autoAddCreatedDate: boolean;
   defaultDailyNoteFolder: string;
   defaultViewMode: ViewMode;
+  defaultLayoutMode: LayoutMode;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -65,5 +67,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   ],
   autoAddCreatedDate: false,
   defaultDailyNoteFolder: 'Jots',
-  defaultViewMode: 'gtd'
+  defaultViewMode: 'gtd',
+  defaultLayoutMode: 'board',
 };

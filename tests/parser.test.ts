@@ -123,8 +123,8 @@ describe('Section Routing', () => {
     });
 
     it('routes scheduled tasks to Scheduled', () => {
-      expect(getGTDSection({ ...baseTask, dueDate: '2026-09-15' }, today)).toBe('gtd-scheduled');
-      expect(getGTDSection({ ...baseTask, scheduledDate: '2026-09-15' }, today)).toBe('gtd-scheduled');
+      expect(getGTDSection({ ...baseTask, dueDate: '2026-09-20' }, today)).toBe('gtd-scheduled');
+      expect(getGTDSection({ ...baseTask, scheduledDate: '2026-09-20' }, today)).toBe('gtd-scheduled');
     });
 
     it('routes someday tasks to Someday / Maybe', () => {

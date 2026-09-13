@@ -1,6 +1,7 @@
-import { Plugin, WorkspaceLeaf, MarkdownView } from 'obsidian';
+import { Plugin, WorkspaceLeaf, MarkdownView, TFile, TAbstractFile, debounce } from 'obsidian';
 import { VaultScanner } from './vault-scanner';
 import { GTDMatrixView, VIEW_TYPE_GTD_MATRIX } from './view';
+import { GTDMatrixSettingTab } from './settings-tab';
 import { PluginSettings, DEFAULT_SETTINGS } from './types';
 
 export default class GTDMatrixPlugin extends Plugin {
@@ -14,7 +15,7 @@ export default class GTDMatrixPlugin extends Plugin {
 
     this.registerView(
       VIEW_TYPE_GTD_MATRIX,
-      (leaf: WorkspaceLeaf) => new GTDMatrixView(leaf, this.scanner)
+      (leaf: WorkspaceLeaf) => new GTDMatrixView(leaf, this.scanner, this.settings)
     );
 
     this.addRibbonIcon('list-todo', 'Open GTD Matrix Tasks', () => {
@@ -28,6 +29,8 @@ export default class GTDMatrixPlugin extends Plugin {
         this.activateView();
       }
     });
+
+    this.addSettingTab(new GTDMatrixSettingTab(this.app, this));
 
     // Folder-based note styling listeners (hide properties in Jots)
     this.registerEvent(
@@ -44,25 +47,35 @@ export default class GTDMatrixPlugin extends Plugin {
       this.updateLeafFolderClasses();
     });
 
-    // Vault change listeners for live updates
+    // Incremental vault change listeners (zero-lag typing)
+    const debouncedReindex = debounce((file: TAbstractFile) => {
+      if (file instanceof TFile && file.extension === 'md') {
+        void this.scanner.reindexFile(file);
+      }
+    }, 300, false);
+
     this.registerEvent(
-      this.app.vault.on('modify', () => {
-        this.scanner.debouncedScan();
+      this.app.vault.on('modify', (file) => {
+        debouncedReindex(file);
       })
     );
     this.registerEvent(
-      this.app.vault.on('delete', () => {
-        this.scanner.debouncedScan();
+      this.app.vault.on('delete', (file) => {
+        this.scanner.handleFileDelete(file.path);
       })
     );
     this.registerEvent(
-      this.app.vault.on('create', () => {
-        this.scanner.debouncedScan();
+      this.app.vault.on('create', (file) => {
+        debouncedReindex(file);
       })
     );
     this.registerEvent(
-      this.app.vault.on('rename', () => {
-        this.scanner.debouncedScan();
+      this.app.vault.on('rename', (file, oldPath) => {
+        if (file instanceof TFile && file.extension === 'md') {
+          void this.scanner.handleFileRename(file, oldPath);
+        } else {
+          this.scanner.handleFileDelete(oldPath);
+        }
       })
     );
   }
