@@ -70,6 +70,31 @@ export class GTDMatrixSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName('Initialize properties on new notes')
+      .setDesc('Automatically ensure newly created notes have the "tags" property initialized in their frontmatter.')
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.autoInitializeNoteProperties !== false)
+          .onChange(async (value) => {
+            this.plugin.settings.autoInitializeNoteProperties = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName('Auto-move notes (Topics & Roles)')
+      .setDesc('Automatically evict non-dated notes from Jots and route notes to proper Topics, Roles, and Resources based on tags.')
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.autoMoveNotes !== false)
+          .onChange(async (value) => {
+            this.plugin.settings.autoMoveNotes = value;
+            this.plugin.autoMover?.updateSettings(this.plugin.settings);
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
       .setName('Excluded folders')
       .setDesc('Folders to exclude from task indexing (one folder path per line).')
       .addTextArea((text) => {

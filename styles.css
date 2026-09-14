@@ -522,8 +522,12 @@
 }
 
 /* ==========================================================================
-   Folder-Specific Note Styling: Hide Properties in Jots
+   Date-Titled Note Styling: Hide Properties Header on Date Notes
    ========================================================================== */
+.is-date-note .metadata-container,
+.is-date-note .metadata-properties,
+.is-date-note .cm-embed-block:has(.metadata-container),
+.is-date-note .cm-embed-block:has(.metadata-properties),
 .is-in-jots .metadata-container,
 .is-in-jots .metadata-properties,
 .is-in-jots .cm-embed-block:has(.metadata-container),

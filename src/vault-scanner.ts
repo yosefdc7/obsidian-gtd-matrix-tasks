@@ -359,7 +359,7 @@ export class VaultScanner {
     const monthStr = months[d.getMonth()];
     const day = String(d.getDate()).padStart(2, '0');
 
-    // Convention in vault: Jots/YYYY/MMM/DD.md
-    return `${this.settings.defaultDailyNoteFolder}/${year}/${monthStr}/${day}.md`;
+    // Convention in vault: Jots/YYYY/MMM/MMM DD YYYY.md
+    return `${this.settings.defaultDailyNoteFolder}/${year}/${monthStr}/${monthStr} ${day} ${year}.md`;
   }
 }

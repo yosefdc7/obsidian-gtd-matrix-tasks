@@ -57,6 +57,8 @@ export interface PluginSettings {
   defaultDailyNoteFolder: string;
   defaultViewMode: ViewMode;
   defaultLayoutMode: LayoutMode;
+  autoInitializeNoteProperties: boolean;
+  autoMoveNotes: boolean;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -69,4 +71,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   defaultDailyNoteFolder: 'Jots',
   defaultViewMode: 'gtd',
   defaultLayoutMode: 'board',
+  autoInitializeNoteProperties: true,
+  autoMoveNotes: true,
 };
