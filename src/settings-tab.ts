@@ -126,6 +126,34 @@ export class GTDMatrixSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName('Auto-inherit parent bullet & heading links')
+      .setDesc('Automatically discover parent bullet and heading linked notes in active Daily Jots and write them onto child tasks.')
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.autoInheritParentLinks !== false)
+          .onChange(async (value) => {
+            this.plugin.settings.autoInheritParentLinks = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName('Active window for daily jots (hours)')
+      .setDesc('Rolling window in hours for Daily Jots auto-linking (default: 24h for today and yesterday, keeping note loading instantaneous).')
+      .addText((text) => {
+        text
+          .setPlaceholder('24')
+          .setValue(String(this.plugin.settings.autoInheritActiveWindowHours ?? 24))
+          .onChange(async (value) => {
+            const parsed = parseInt(value, 10);
+            if (!isNaN(parsed) && parsed > 0) {
+              this.plugin.settings.autoInheritActiveWindowHours = parsed;
+              await this.plugin.saveSettings();
+            }
+          });
+      });
+
+    new Setting(containerEl)
       .setName('Excluded folders')
       .setDesc('Folders to exclude from task indexing (one folder path per line).')
       .addTextArea((text) => {

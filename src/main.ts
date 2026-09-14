@@ -1,10 +1,11 @@
-import { Plugin, WorkspaceLeaf, MarkdownView, TFile, TAbstractFile, debounce } from 'obsidian';
+import { Plugin, WorkspaceLeaf, MarkdownView, TFile, TAbstractFile, debounce, Notice } from 'obsidian';
 import { VaultScanner } from './vault-scanner';
 import { GTDMatrixView, VIEW_TYPE_GTD_MATRIX } from './view';
 import { GTDMatrixSettingTab } from './settings-tab';
 import { PluginSettings, DEFAULT_SETTINGS } from './types';
 import { isDateTitledNote } from './date-utils';
 import { AutoMover } from './auto-mover';
+import { reconcileNoteContent, isWithinActiveWindow } from './context-linker';
 
 export default class GTDMatrixPlugin extends Plugin {
   public settings: PluginSettings = DEFAULT_SETTINGS;
@@ -34,6 +35,27 @@ export default class GTDMatrixPlugin extends Plugin {
       }
     });
 
+    this.addCommand({
+      id: 'reconcile-current-note',
+      name: 'Reconcile parent bullet links in current note',
+      checkCallback: (checking: boolean) => {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (!activeFile || activeFile.extension !== 'md') return false;
+        if (!checking) {
+          void this.reconcileFileContext(activeFile, true);
+        }
+        return true;
+      }
+    });
+
+    this.addCommand({
+      id: 'reconcile-active-daily-jots',
+      name: 'Reconcile active Daily Jots (last 24 hours)',
+      callback: () => {
+        void this.reconcileActiveDailyJots(true);
+      }
+    });
+
     this.addSettingTab(new GTDMatrixSettingTab(this.app, this));
 
     // Folder-based note styling listeners (hide properties in Jots)
@@ -43,6 +65,12 @@ export default class GTDMatrixPlugin extends Plugin {
         if (file instanceof TFile && file.extension === 'md') {
           void this.ensureNoteProperties(file, true);
           void this.autoMover.processFile(file);
+          if (this.settings.autoInheritParentLinks !== false) {
+            const isDaily = isDateTitledNote(file.path) || file.path.startsWith((this.settings.defaultDailyNoteFolder || 'Jots') + '/');
+            if (!isDaily || isWithinActiveWindow(file.path, this.settings.autoInheritActiveWindowHours)) {
+              void this.reconcileFileContext(file, false);
+            }
+          }
         }
       })
     );
@@ -54,7 +82,22 @@ export default class GTDMatrixPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       this.updateLeafFolderClasses();
       void this.autoMover.evictNonDateNotesFromJots();
+      if (this.settings.autoInheritParentLinks !== false) {
+        void this.reconcileActiveDailyJots(false);
+      }
     });
+
+    const debouncedContextReconcile = debounce((file: TFile) => {
+      if (this.settings.autoInheritParentLinks === false) return;
+      if (file.extension !== 'md') return;
+
+      const isDaily = isDateTitledNote(file.path) || file.path.startsWith((this.settings.defaultDailyNoteFolder || 'Jots') + '/');
+      if (isDaily && !isWithinActiveWindow(file.path, this.settings.autoInheritActiveWindowHours)) {
+        return; // Guard 24h rolling window
+      }
+
+      void this.reconcileFileContext(file, false);
+    }, 800, false);
 
     // Incremental vault change listeners (zero-lag typing)
     const debouncedReindex = debounce((file: TAbstractFile) => {
@@ -66,6 +109,9 @@ export default class GTDMatrixPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on('modify', (file) => {
         debouncedReindex(file);
+        if (file instanceof TFile && file.extension === 'md') {
+          debouncedContextReconcile(file);
+        }
       })
     );
     this.registerEvent(
@@ -79,6 +125,7 @@ export default class GTDMatrixPlugin extends Plugin {
         if (file instanceof TFile && file.extension === 'md') {
           await this.ensureNoteProperties(file, false);
           await this.autoMover.processFile(file);
+          debouncedContextReconcile(file);
         }
       })
     );
@@ -156,6 +203,55 @@ export default class GTDMatrixPlugin extends Plugin {
     } catch (e) {
       console.warn('GTD Matrix: failed to initialize note properties', e);
     }
+  }
+
+  async reconcileFileContext(file: TFile, showNotice: boolean = false): Promise<number> {
+    try {
+      let changeCount = 0;
+      await this.app.vault.process(file, (data) => {
+        const result = reconcileNoteContent(data);
+        changeCount = result.changesCount;
+        return result.changesCount > 0 ? result.content : data;
+      });
+
+      if (showNotice) {
+        if (changeCount > 0) {
+          new Notice(`Reconciled ${changeCount} task(s) with parent context in ${file.basename}`);
+        } else {
+          new Notice(`No tasks needed context reconciliation in ${file.basename}`);
+        }
+      }
+      return changeCount;
+    } catch (e) {
+      console.warn(`GTD Matrix: failed to reconcile context in ${file.path}`, e);
+      return 0;
+    }
+  }
+
+  async reconcileActiveDailyJots(showNotice: boolean = false): Promise<number> {
+    const dailyFolder = this.settings.defaultDailyNoteFolder || 'Jots';
+    const activeHours = this.settings.autoInheritActiveWindowHours ?? 24;
+    const files = this.app.vault.getMarkdownFiles();
+
+    let totalChangedTasks = 0;
+    let modifiedFilesCount = 0;
+
+    for (const file of files) {
+      const isDaily = isDateTitledNote(file.path) || file.path.startsWith(dailyFolder + '/');
+      if (isDaily && isWithinActiveWindow(file.path, activeHours)) {
+        const changes = await this.reconcileFileContext(file, false);
+        if (changes > 0) {
+          totalChangedTasks += changes;
+          modifiedFilesCount++;
+        }
+      }
+    }
+
+    if (showNotice) {
+      new Notice(`Reconciled ${totalChangedTasks} task(s) across ${modifiedFilesCount} active Daily Jot note(s).`);
+    }
+
+    return totalChangedTasks;
   }
 
   private updateLeafFolderClasses(): void {

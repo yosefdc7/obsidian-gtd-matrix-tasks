@@ -83,6 +83,8 @@ export interface PluginSettings {
   activeFilterRoles: string[];
   autoInitializeNoteProperties: boolean;
   autoMoveNotes: boolean;
+  autoInheritParentLinks: boolean;
+  autoInheritActiveWindowHours: number;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -105,5 +107,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   ],
   autoInitializeNoteProperties: true,
   autoMoveNotes: true,
+  autoInheritParentLinks: true,
+  autoInheritActiveWindowHours: 24,
 };
 
