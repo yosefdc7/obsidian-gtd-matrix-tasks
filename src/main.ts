@@ -11,6 +11,7 @@ export default class GTDMatrixPlugin extends Plugin {
   public settings: PluginSettings = DEFAULT_SETTINGS;
   public scanner: VaultScanner = null!;
   public autoMover: AutoMover = null!;
+  public lastActiveFile: TFile | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -62,15 +63,25 @@ export default class GTDMatrixPlugin extends Plugin {
     this.registerEvent(
       this.app.workspace.on('file-open', (file) => {
         this.updateLeafFolderClasses();
+
+        // Safely reconcile note that the user just finished drafting and navigated away from
+        if (
+          this.lastActiveFile &&
+          this.lastActiveFile !== file &&
+          this.settings.autoInheritParentLinks !== false
+        ) {
+          const prevFile = this.lastActiveFile;
+          const isDaily = isDateTitledNote(prevFile.path) || prevFile.path.startsWith((this.settings.defaultDailyNoteFolder || 'Jots') + '/');
+          if (!isDaily || isWithinActiveWindow(prevFile.path, this.settings.autoInheritActiveWindowHours)) {
+            void this.reconcileFileContext(prevFile, false);
+          }
+        }
+
+        this.lastActiveFile = file instanceof TFile && file.extension === 'md' ? file : null;
+
         if (file instanceof TFile && file.extension === 'md') {
           void this.ensureNoteProperties(file, true);
           void this.autoMover.processFile(file);
-          if (this.settings.autoInheritParentLinks !== false) {
-            const isDaily = isDateTitledNote(file.path) || file.path.startsWith((this.settings.defaultDailyNoteFolder || 'Jots') + '/');
-            if (!isDaily || isWithinActiveWindow(file.path, this.settings.autoInheritActiveWindowHours)) {
-              void this.reconcileFileContext(file, false);
-            }
-          }
         }
       })
     );
@@ -81,25 +92,14 @@ export default class GTDMatrixPlugin extends Plugin {
     );
     this.app.workspace.onLayoutReady(() => {
       this.updateLeafFolderClasses();
+      this.lastActiveFile = this.app.workspace.getActiveFile();
       void this.autoMover.evictNonDateNotesFromJots();
       if (this.settings.autoInheritParentLinks !== false) {
         void this.reconcileActiveDailyJots(false);
       }
     });
 
-    const debouncedContextReconcile = debounce((file: TFile) => {
-      if (this.settings.autoInheritParentLinks === false) return;
-      if (file.extension !== 'md') return;
-
-      const isDaily = isDateTitledNote(file.path) || file.path.startsWith((this.settings.defaultDailyNoteFolder || 'Jots') + '/');
-      if (isDaily && !isWithinActiveWindow(file.path, this.settings.autoInheritActiveWindowHours)) {
-        return; // Guard 24h rolling window
-      }
-
-      void this.reconcileFileContext(file, false);
-    }, 800, false);
-
-    // Incremental vault change listeners (zero-lag typing)
+    // Incremental vault change listeners (zero-lag typing, ZERO real-time file rewriting)
     const debouncedReindex = debounce((file: TAbstractFile) => {
       if (file instanceof TFile && file.extension === 'md') {
         void this.scanner.reindexFile(file);
@@ -109,9 +109,6 @@ export default class GTDMatrixPlugin extends Plugin {
     this.registerEvent(
       this.app.vault.on('modify', (file) => {
         debouncedReindex(file);
-        if (file instanceof TFile && file.extension === 'md') {
-          debouncedContextReconcile(file);
-        }
       })
     );
     this.registerEvent(
@@ -125,7 +122,6 @@ export default class GTDMatrixPlugin extends Plugin {
         if (file instanceof TFile && file.extension === 'md') {
           await this.ensureNoteProperties(file, false);
           await this.autoMover.processFile(file);
-          debouncedContextReconcile(file);
         }
       })
     );

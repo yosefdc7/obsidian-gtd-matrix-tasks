@@ -137,19 +137,7 @@ export function findParentContext(lines: string[], taskIndex: number): ParentCon
     return { link: foundBulletLink, type: 'bullet' };
   }
 
-  // 2. Fallback: Search upward for nearest markdown heading with a wikilink
-  for (let i = taskIndex - 1; i >= 0; i--) {
-    const line = lines[i];
-    const headingMatch = line.match(HEADING_REGEX);
-    if (headingMatch) {
-      const headingContent = headingMatch[2];
-      const links = extractWikilinks(headingContent);
-      if (links.length > 0) {
-        return { link: pickBestLink(links), type: 'heading' };
-      }
-    }
-  }
-
+  // Parent Bullets Only: Headings are never auto-inherited onto tasks
   return { link: null, type: 'none' };
 }
 

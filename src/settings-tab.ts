@@ -126,8 +126,8 @@ export class GTDMatrixSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Auto-inherit parent bullet & heading links')
-      .setDesc('Automatically discover parent bullet and heading linked notes in active Daily Jots and write them onto child tasks.')
+      .setName('Auto-inherit parent bullet links (on note exit & startup)')
+      .setDesc('Automatically discover parent bullet linked notes in active Daily Jots and write them onto indented child tasks when navigating away or on startup (zero typing interference).')
       .addToggle((toggle) => {
         toggle
           .setValue(this.plugin.settings.autoInheritParentLinks !== false)

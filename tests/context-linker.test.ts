@@ -88,23 +88,23 @@ describe('ContextLinker', () => {
       });
     });
 
-    it('falls back to nearest heading when task has no parent bullet with link', () => {
+    it('does NOT inherit markdown headings (parent bullets only)', () => {
       const lines = [
         '# [[Yo Manager]]',
         '',
         '- [ ] root level task',
-        '- another bullet',
+        '- another bullet without link',
         '  - [ ] indented task under bullet with no link'
       ];
 
       expect(findParentContext(lines, 2)).toEqual({
-        link: 'Yo Manager',
-        type: 'heading'
+        link: null,
+        type: 'none'
       });
 
       expect(findParentContext(lines, 4)).toEqual({
-        link: 'Yo Manager',
-        type: 'heading'
+        link: null,
+        type: 'none'
       });
     });
 
@@ -198,7 +198,7 @@ describe('ContextLinker', () => {
   });
 
   describe('reconcileNoteContent', () => {
-    it('reconciles entire daily note outline accurately', () => {
+    it('reconciles entire daily note outline accurately (parent bullets only)', () => {
       const noteContent = `# [[Yo Manager]]
 
 - [[Executive Dashboard]]
@@ -210,10 +210,12 @@ describe('ContextLinker', () => {
 `;
 
       const result = reconcileNoteContent(noteContent);
-      expect(result.changesCount).toBe(3);
+      expect(result.changesCount).toBe(2);
       expect(result.content).toContain('\t- [ ] check progress of data maps [[Executive Dashboard]]');
       expect(result.content).toContain('\t- [ ] meet with daas person [[Executive Dashboard]] ⏳ 2026-09-14');
-      expect(result.content).toContain('- [ ] general team sync [[Yo Manager]] 📅 2026-09-15');
+      // Root-level task directly under heading must remain untouched!
+      expect(result.content).toContain('- [ ] general team sync 📅 2026-09-15');
+      expect(result.content).not.toContain('- [ ] general team sync [[Yo Manager]]');
       expect(result.content).toContain('- [x] completed task that should not be touched');
     });
   });
