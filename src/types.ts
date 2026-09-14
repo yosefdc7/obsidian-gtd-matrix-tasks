@@ -2,6 +2,23 @@ export type TaskPriority = 'highest' | 'high' | 'medium' | 'low' | 'lowest' | 'n
 
 export type ViewMode = 'gtd' | 'eisenhower';
 export type LayoutMode = 'board' | 'list';
+export type SortCriteria = 'date' | 'priority' | 'title' | 'created';
+export type TagViewMode = 'filter' | 'swimlanes';
+
+export type RoleId =
+  | 'role/yo-manager'
+  | 'role/josef-selfcare'
+  | 'role/rj-supportive'
+  | 'untagged';
+
+export interface SwimlaneDefinition {
+  id: RoleId;
+  title: string;
+  subtitle: string;
+  icon: string;
+  badgeClass: string;
+  roleTag: string | null;
+}
 
 export type GTDSectionId =
   | 'gtd-inbox'
@@ -36,10 +53,14 @@ export interface TaskItem {
   scheduledDate: string | null;
   startDate: string | null;
   completedDate: string | null;
+  createdDate: string | null;
   tags: string[];
   isWaiting: boolean;
   isSomeday: boolean;
   isProject: boolean;
+  linkedNotes: string[];
+  effectiveRole: RoleId;
+  roleSource: 'inline' | 'linked-note' | 'parent-note' | 'none';
 }
 
 export interface SectionDefinition {
@@ -57,6 +78,9 @@ export interface PluginSettings {
   defaultDailyNoteFolder: string;
   defaultViewMode: ViewMode;
   defaultLayoutMode: LayoutMode;
+  defaultSortCriteria: SortCriteria;
+  defaultTagViewMode: TagViewMode;
+  activeFilterRoles: string[];
   autoInitializeNoteProperties: boolean;
   autoMoveNotes: boolean;
 }
@@ -71,6 +95,15 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   defaultDailyNoteFolder: 'Jots',
   defaultViewMode: 'gtd',
   defaultLayoutMode: 'board',
+  defaultSortCriteria: 'date',
+  defaultTagViewMode: 'filter',
+  activeFilterRoles: [
+    'role/yo-manager',
+    'role/josef-selfcare',
+    'role/rj-supportive',
+    'untagged'
+  ],
   autoInitializeNoteProperties: true,
   autoMoveNotes: true,
 };
+

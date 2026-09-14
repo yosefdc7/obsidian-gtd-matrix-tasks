@@ -1,15 +1,18 @@
-import { TaskItem, TaskPriority, GTDSectionId, EisenhowerSectionId } from './types';
+import { TaskItem, TaskPriority, GTDSectionId, EisenhowerSectionId, RoleId, SortCriteria } from './types';
 
 const TASK_REGEX = /^(\s*[-*+]\s*\[)(.)(\]\s*)(.*)$/;
 const DUE_DATE_REGEX = /📅\s*(\d{4}-\d{2}-\d{2})/;
 const SCHEDULED_DATE_REGEX = /⏳\s*(\d{4}-\d{2}-\d{2})/;
 const START_DATE_REGEX = /🛫\s*(\d{4}-\d{2}-\d{2})/;
 const COMPLETED_DATE_REGEX = /✅\s*(\d{4}-\d{2}-\d{2})/;
+const CREATED_DATE_REGEX = /➕\s*(\d{4}-\d{2}-\d{2})/;
 const PRIORITY_EMOJI_REGEX = /[⏫🔺🔼🔽⏬]/gu;
 const EISEN_TAG_REGEX = /#eisen\/[a-zA-Z0-9_-]+/g;
 const TAG_REGEX = /#[a-zA-Z0-9_/-]+/g;
 const SOMEDAY_REGEX = /#(someday|maybe)\b/i;
 const WAITING_REGEX = /#waiting\b|@waiting\b|\bwaiting on\b|#blocked\b|#on-hold\b|#onhold\b/i;
+const WIKILINK_REGEX = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]/g;
+const ROLE_TAG_REGEX = /#role\/[a-zA-Z0-9_-]+/g;
 
 export function parseTaskLine(line: string, filePath: string, lineNumber: number): TaskItem | null {
   const match = line.match(TASK_REGEX);
@@ -35,6 +38,9 @@ export function parseTaskLine(line: string, filePath: string, lineNumber: number
   const completedMatch = body.match(COMPLETED_DATE_REGEX);
   const completedDate = completedMatch ? completedMatch[1] : null;
 
+  const createdMatch = body.match(CREATED_DATE_REGEX);
+  const createdDate = createdMatch ? createdMatch[1] : null;
+
   // Extract Priority
   let priority: TaskPriority = 'none';
   if (body.includes('⏫') || body.includes('🔺') || body.includes('#eisen/urgent-important')) {
@@ -54,6 +60,17 @@ export function parseTaskLine(line: string, filePath: string, lineNumber: number
     tags.push(...tagMatches);
   }
 
+  // Extract Linked Notes [[Note]]
+  const linkedNotes: string[] = [];
+  let linkMatch: RegExpExecArray | null;
+  const linkRegex = new RegExp(WIKILINK_REGEX.source, 'g');
+  while ((linkMatch = linkRegex.exec(body)) !== null) {
+    const noteName = linkMatch[1]?.trim();
+    if (noteName && !linkedNotes.includes(noteName)) {
+      linkedNotes.push(noteName);
+    }
+  }
+
   // GTD State detection
   const isWaiting = statusChar === '?' || WAITING_REGEX.test(body);
   const isSomeday = SOMEDAY_REGEX.test(body) || priority === 'low';
@@ -65,6 +82,7 @@ export function parseTaskLine(line: string, filePath: string, lineNumber: number
     .replace(SCHEDULED_DATE_REGEX, '')
     .replace(START_DATE_REGEX, '')
     .replace(COMPLETED_DATE_REGEX, '')
+    .replace(CREATED_DATE_REGEX, '')
     .replace(PRIORITY_EMOJI_REGEX, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -86,10 +104,14 @@ export function parseTaskLine(line: string, filePath: string, lineNumber: number
     scheduledDate,
     startDate,
     completedDate,
+    createdDate,
     tags,
     isWaiting,
     isSomeday,
-    isProject
+    isProject,
+    linkedNotes,
+    effectiveRole: 'untagged',
+    roleSource: 'none'
   };
 }
 
@@ -272,3 +294,108 @@ export function getEisenhowerSection(task: TaskItem, todayStr: string): Eisenhow
 
   return 'eisen-inbox';
 }
+
+export const ROLE_IDS: RoleId[] = [
+  'role/yo-manager',
+  'role/josef-selfcare',
+  'role/rj-supportive'
+];
+
+export function extractRoleFromTags(tags: string[]): RoleId | null {
+  for (const tag of tags) {
+    const cleanTag = tag.replace(/^#/, '').toLowerCase().trim();
+    if (cleanTag === 'role/yo-manager' || cleanTag === 'yo-manager') return 'role/yo-manager';
+    if (
+      cleanTag === 'role/josef-selfcare' ||
+      cleanTag === 'josef-selfcare' ||
+      cleanTag === 'role/josef-self-care' ||
+      cleanTag === 'josef-self-care'
+    ) {
+      return 'role/josef-selfcare';
+    }
+    if (cleanTag === 'role/rj-supportive' || cleanTag === 'rj-supportive') return 'role/rj-supportive';
+  }
+  return null;
+}
+
+export function extractRoleFromPath(filePath: string): RoleId | null {
+  const norm = filePath.replace(/\\/g, '/');
+  if (norm.startsWith('Roles/Yo Manager/') || norm.includes('/Yo Manager/')) return 'role/yo-manager';
+  if (norm.startsWith('Roles/Josef Self-Care/') || norm.includes('/Josef Self-Care/')) return 'role/josef-selfcare';
+  if (norm.startsWith('Roles/RJ Supportive/') || norm.includes('/RJ Supportive/')) return 'role/rj-supportive';
+  return null;
+}
+
+export function setTaskRole(line: string, newRole: RoleId | null): string {
+  const clean = line.replace(ROLE_TAG_REGEX, '').replace(/[ \t]{2,}/g, ' ').trimEnd();
+  if (!newRole || newRole === 'untagged') {
+    return clean;
+  }
+  return `${clean} #${newRole}`;
+}
+
+
+export function sortTasks(tasks: TaskItem[], criteria: SortCriteria): TaskItem[] {
+  const list = [...tasks];
+  switch (criteria) {
+    case 'date':
+      return list.sort((a, b) => {
+        const dateA = a.scheduledDate || a.dueDate || a.startDate;
+        const dateB = b.scheduledDate || b.dueDate || b.startDate;
+        if (dateA && dateB) {
+          const cmp = dateA.localeCompare(dateB);
+          if (cmp !== 0) return cmp;
+        } else if (dateA && !dateB) {
+          return -1;
+        } else if (!dateA && dateB) {
+          return 1;
+        }
+        return a.fileName.localeCompare(b.fileName);
+      });
+
+    case 'priority': {
+      const weight: Record<TaskPriority, number> = {
+        highest: 5,
+        high: 4,
+        medium: 3,
+        low: 2,
+        lowest: 1,
+        none: 0
+      };
+      return list.sort((a, b) => {
+        const diff = (weight[b.priority] ?? 0) - (weight[a.priority] ?? 0);
+        if (diff !== 0) return diff;
+        const dateA = a.scheduledDate || a.dueDate || a.startDate;
+        const dateB = b.scheduledDate || b.dueDate || b.startDate;
+        if (dateA && dateB) return dateA.localeCompare(dateB);
+        if (dateA && !dateB) return -1;
+        if (!dateA && dateB) return 1;
+        return a.fileName.localeCompare(b.fileName);
+      });
+    }
+
+    case 'title':
+      return list.sort((a, b) => {
+        return a.description.localeCompare(b.description, undefined, { sensitivity: 'base' });
+      });
+
+    case 'created':
+      return list.sort((a, b) => {
+        const cA = a.createdDate;
+        const cB = b.createdDate;
+        if (cA && cB) {
+          const cmp = cB.localeCompare(cA); // Newest first
+          if (cmp !== 0) return cmp;
+        } else if (cA && !cB) {
+          return -1;
+        } else if (!cA && cB) {
+          return 1;
+        }
+        return a.fileName.localeCompare(b.fileName);
+      });
+
+    default:
+      return list;
+  }
+}
+

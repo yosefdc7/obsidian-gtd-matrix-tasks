@@ -1,5 +1,5 @@
 import { App, TFile, debounce } from 'obsidian';
-import { TaskItem, TaskPriority, SectionId, PluginSettings } from './types';
+import { TaskItem, TaskPriority, SectionId, PluginSettings, RoleId } from './types';
 import {
   parseTaskLine,
   setTaskPriority,
@@ -8,7 +8,10 @@ import {
   setTaskScheduledDate,
   setTaskDescription,
   setTaskWaiting,
-  setTaskSomeday
+  setTaskSomeday,
+  setTaskRole,
+  extractRoleFromTags,
+  extractRoleFromPath
 } from './parser';
 
 export class VaultScanner {
@@ -29,7 +32,7 @@ export class VaultScanner {
   public onTasksUpdated(callback: (tasks: TaskItem[]) => void): () => void {
     this.listeners.push(callback);
     return () => {
-      this.listeners = this.listeners.filter((cb) => cb !== callback);
+      this.listeners = this.listeners.filter((l) => l !== callback);
     };
   }
 
@@ -47,6 +50,10 @@ export class VaultScanner {
     return this.tasks;
   }
 
+  public updateSettings(settings: PluginSettings): void {
+    this.settings = settings;
+  }
+
   public isExcluded(filePath: string): boolean {
     const normalized = filePath.replace(/\\/g, '/');
     for (const excluded of this.settings.excludedFolders) {
@@ -58,15 +65,63 @@ export class VaultScanner {
     return false;
   }
 
-  public async scanVault(): Promise<TaskItem[]> {
-    const files = this.app.vault.getMarkdownFiles().filter((file) => {
-      if (this.isExcluded(file.path)) return false;
-      const cache = this.app.metadataCache.getFileCache(file);
-      if (cache && (!cache.listItems || !cache.listItems.some((i) => i.task !== undefined))) {
-        return false;
+  public resolveTaskRole(task: TaskItem): { role: RoleId; source: 'inline' | 'linked-note' | 'parent-note' | 'none' } {
+    // 1. Inline tag on task
+    const inlineRole = extractRoleFromTags(task.tags);
+    if (inlineRole) {
+      return { role: inlineRole, source: 'inline' };
+    }
+
+    // 2. Linked note role
+    if (task.linkedNotes && task.linkedNotes.length > 0) {
+      for (const link of task.linkedNotes) {
+        const targetFile = this.app.metadataCache.getFirstLinkpathDest(link, task.filePath);
+        if (targetFile) {
+          const pathRole = extractRoleFromPath(targetFile.path);
+          if (pathRole) {
+            return { role: pathRole, source: 'linked-note' };
+          }
+          const cache = this.app.metadataCache.getFileCache(targetFile);
+          const frontTags = cache?.frontmatter?.tags;
+          const tagsList: string[] = Array.isArray(frontTags)
+            ? frontTags.map(String)
+            : typeof frontTags === 'string'
+            ? frontTags.split(',').map((s) => s.trim())
+            : [];
+          const tagRole = extractRoleFromTags(tagsList);
+          if (tagRole) {
+            return { role: tagRole, source: 'linked-note' };
+          }
+        }
       }
-      return true;
-    });
+    }
+
+    // 3. Parent note role (path or frontmatter)
+    const parentPathRole = extractRoleFromPath(task.filePath);
+    if (parentPathRole) {
+      return { role: parentPathRole, source: 'parent-note' };
+    }
+    const parentAbstract = this.app.vault.getAbstractFileByPath(task.filePath);
+    if (parentAbstract instanceof TFile) {
+      const parentCache = this.app.metadataCache.getFileCache(parentAbstract);
+      const frontTags = parentCache?.frontmatter?.tags;
+      const tagsList: string[] = Array.isArray(frontTags)
+        ? frontTags.map(String)
+        : typeof frontTags === 'string'
+        ? frontTags.split(',').map((s) => s.trim())
+        : [];
+      const parentTagRole = extractRoleFromTags(tagsList);
+      if (parentTagRole) {
+        return { role: parentTagRole, source: 'parent-note' };
+      }
+    }
+
+    // 4. Fallback
+    return { role: 'untagged', source: 'none' };
+  }
+
+  public async scanVault(): Promise<TaskItem[]> {
+    const files = this.app.vault.getMarkdownFiles().filter((f) => !this.isExcluded(f.path));
 
     const allTasks: TaskItem[] = [];
     const CHUNK_SIZE = 50;
@@ -86,14 +141,24 @@ export class VaultScanner {
                   const lineIdx = item.position.start.line;
                   if (lineIdx < lines.length) {
                     const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-                    if (task) allTasks.push(task);
+                    if (task) {
+                      const res = this.resolveTaskRole(task);
+                      task.effectiveRole = res.role;
+                      task.roleSource = res.source;
+                      allTasks.push(task);
+                    }
                   }
                 }
               }
             } else {
               for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
                 const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-                if (task) allTasks.push(task);
+                if (task) {
+                  const res = this.resolveTaskRole(task);
+                  task.effectiveRole = res.role;
+                  task.roleSource = res.source;
+                  allTasks.push(task);
+                }
               }
             }
           } catch (err) {
@@ -135,14 +200,24 @@ export class VaultScanner {
               const lineIdx = item.position.start.line;
               if (lineIdx < lines.length) {
                 const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-                if (task) fileTasks.push(task);
+                if (task) {
+                  const res = this.resolveTaskRole(task);
+                  task.effectiveRole = res.role;
+                  task.roleSource = res.source;
+                  fileTasks.push(task);
+                }
               }
             }
           }
         } else {
           for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
             const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-            if (task) fileTasks.push(task);
+            if (task) {
+              const res = this.resolveTaskRole(task);
+              task.effectiveRole = res.role;
+              task.roleSource = res.source;
+              fileTasks.push(task);
+            }
           }
         }
       } catch (err) {
@@ -261,7 +336,13 @@ export class VaultScanner {
     );
   }
 
-  public async quickAddTask(sectionId: SectionId, text: string): Promise<boolean> {
+  public async setRole(task: TaskItem, newRole: RoleId | null): Promise<boolean> {
+    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
+      setTaskRole(line, newRole)
+    );
+  }
+
+  public async quickAddTask(sectionId: SectionId, text: string, role?: RoleId | null): Promise<boolean> {
     const dailyPath = this.getDailyNotePath();
     let file = this.app.vault.getAbstractFileByPath(dailyPath);
 
@@ -298,10 +379,17 @@ export class VaultScanner {
         break;
     }
 
+    if (role && role !== 'untagged') {
+      extra += ` #${role}`;
+    }
+
     const statusBox = isWaiting ? '- [?]' : '- [ ]';
     let rawTask = `${statusBox} ${text.trim()}${extra}`;
     if (priority !== 'none') {
       rawTask = setTaskPriority(rawTask, priority);
+    }
+    if (this.settings.autoAddCreatedDate) {
+      rawTask += ` ➕ ${this.getTodayDateString()}`;
     }
 
     if (!(file instanceof TFile)) {

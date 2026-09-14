@@ -103,7 +103,11 @@ describe('Section Routing', () => {
     tags: [],
     isWaiting: false,
     isSomeday: false,
-    isProject: false
+    isProject: false,
+    createdDate: null,
+    linkedNotes: [],
+    effectiveRole: 'untagged',
+    roleSource: 'none'
   };
 
   const today = '2026-09-12';

@@ -712,3 +712,229 @@
   align-items: center;
   margin-top: 2px;
 }
+
+/* Sort Dropdown */
+.gtd-sort-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.gtd-sort-select {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.gtd-sort-select:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+/* Role Filter Chips */
+.gtd-role-chips-wrapper {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.gtd-role-chip-btn {
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 0.78em;
+  font-weight: 600;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gtd-role-chip-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.gtd-role-chip-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.gtd-role-chip-btn.chip-role-yo-manager.is-active {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--color-blue, #3b82f6);
+  border-color: var(--color-blue, #3b82f6);
+}
+
+.gtd-role-chip-btn.chip-role-josef-selfcare.is-active {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--color-green, #10b981);
+  border-color: var(--color-green, #10b981);
+}
+
+.gtd-role-chip-btn.chip-role-rj-supportive.is-active {
+  background: rgba(139, 92, 246, 0.2);
+  color: var(--color-purple, #8b5cf6);
+  border-color: var(--color-purple, #8b5cf6);
+}
+
+.gtd-role-chip-btn.chip-untagged.is-active {
+  background: rgba(148, 163, 184, 0.2);
+  color: var(--text-muted);
+  border-color: var(--text-muted);
+}
+
+/* Role Badges on Tasks */
+.gtd-role-badge {
+  font-size: 0.72em;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+}
+
+.badge-role-yo-manager {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--color-blue, #3b82f6);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge-role-josef-selfcare {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-green, #10b981);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-role-rj-supportive {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--color-purple, #8b5cf6);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.badge-role-untagged {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-muted);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+/* Swimlanes Container & Rows */
+.gtd-swimlanes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.gtd-swimlane-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary-alt);
+  padding: 12px 14px;
+}
+
+.gtd-swimlane-row.badge-role-yo-manager {
+  border-left: 4px solid var(--color-blue, #3b82f6);
+}
+
+.gtd-swimlane-row.badge-role-josef-selfcare {
+  border-left: 4px solid var(--color-green, #10b981);
+}
+
+.gtd-swimlane-row.badge-role-rj-supportive {
+  border-left: 4px solid var(--color-purple, #8b5cf6);
+}
+
+.gtd-swimlane-row.badge-role-untagged {
+  border-left: 4px solid var(--text-muted);
+}
+
+.gtd-swimlane-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.gtd-swimlane-header:hover {
+  background: var(--background-modifier-hover);
+}
+
+.gtd-swimlane-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-accent);
+}
+
+.gtd-swimlane-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gtd-swimlane-title {
+  font-weight: 700;
+  font-size: 1.05em;
+  color: var(--text-normal);
+}
+
+.gtd-swimlane-subtitle {
+  font-size: 0.82em;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.gtd-swimlane-board {
+  margin-top: 4px;
+  min-height: 180px;
+}
+
+/* Swimlanes List View */
+.gtd-swimlanes-list-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gtd-swimlane-list-group {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary-alt);
+  overflow: hidden;
+}
+
+.gtd-swimlane-list-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--background-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.gtd-swimlane-list-header:hover {
+  background: var(--background-modifier-hover);
+}
+
+.gtd-swimlane-list-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+

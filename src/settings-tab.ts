@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type GTDMatrixPlugin from './main';
-import { ViewMode, LayoutMode } from './types';
+import { ViewMode, LayoutMode, SortCriteria, TagViewMode } from './types';
 
 export class GTDMatrixSettingTab extends PluginSettingTab {
   plugin: GTDMatrixPlugin;
@@ -43,6 +43,37 @@ export class GTDMatrixSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
+
+    new Setting(containerEl)
+      .setName('Default sort criteria')
+      .setDesc('Default ordering applied to tasks within each section/column.')
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('date', 'Date (Earliest first)')
+          .addOption('priority', 'Priority (Highest to Lowest)')
+          .addOption('title', 'Title (Alphabetical A-Z)')
+          .addOption('created', 'Created Date (Newest first)')
+          .setValue(this.plugin.settings.defaultSortCriteria || 'date')
+          .onChange(async (value) => {
+            this.plugin.settings.defaultSortCriteria = value as SortCriteria;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName('Default role mode')
+      .setDesc('Choose whether role tags filter standard columns or create horizontal swimlanes.')
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('filter', 'Filter Mode (hide non-matching)')
+          .addOption('swimlanes', 'Swimlanes Mode (horizontal role rows)')
+          .setValue(this.plugin.settings.defaultTagViewMode || 'filter')
+          .onChange(async (value) => {
+            this.plugin.settings.defaultTagViewMode = value as TagViewMode;
+            await this.plugin.saveSettings();
+          });
+      });
+
 
     new Setting(containerEl)
       .setName('Default daily notes folder')

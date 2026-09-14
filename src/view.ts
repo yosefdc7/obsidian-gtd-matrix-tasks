@@ -1,7 +1,19 @@
 import { ItemView, WorkspaceLeaf, setIcon, Menu, MarkdownRenderer } from 'obsidian';
 import { VaultScanner } from './vault-scanner';
-import { TaskItem, TaskPriority, SectionId, SectionDefinition, ViewMode, LayoutMode, PluginSettings } from './types';
-import { getGTDSection, getEisenhowerSection } from './parser';
+import {
+  TaskItem,
+  TaskPriority,
+  SectionId,
+  SectionDefinition,
+  ViewMode,
+  LayoutMode,
+  PluginSettings,
+  SortCriteria,
+  TagViewMode,
+  RoleId,
+  SwimlaneDefinition
+} from './types';
+import { getGTDSection, getEisenhowerSection, sortTasks } from './parser';
 
 export const VIEW_TYPE_GTD_MATRIX = 'gtd-matrix-tasks-view';
 
@@ -95,10 +107,54 @@ const EISENHOWER_SECTIONS: SectionDefinition[] = [
   }
 ];
 
+export const ROLE_SWIMLANES: SwimlaneDefinition[] = [
+  {
+    id: 'role/yo-manager',
+    title: 'Yo Manager',
+    subtitle: 'Engineering, product delivery, apps, and operations.',
+    icon: 'briefcase',
+    badgeClass: 'badge-role-yo-manager',
+    roleTag: 'role/yo-manager'
+  },
+  {
+    id: 'role/josef-selfcare',
+    title: 'Josef Self-Care',
+    subtitle: 'Health, personal growth, habits, and life strategy.',
+    icon: 'heart',
+    badgeClass: 'badge-role-josef-selfcare',
+    roleTag: 'role/josef-selfcare'
+  },
+  {
+    id: 'role/rj-supportive',
+    title: 'RJ Supportive',
+    subtitle: 'Family, home, partner support, and shared commitments.',
+    icon: 'users',
+    badgeClass: 'badge-role-rj-supportive',
+    roleTag: 'role/rj-supportive'
+  },
+  {
+    id: 'untagged',
+    title: 'Other / Untagged',
+    subtitle: 'Tasks without a designated role tag or link.',
+    icon: 'help-circle',
+    badgeClass: 'badge-role-untagged',
+    roleTag: null
+  }
+];
+
 export class GTDMatrixView extends ItemView {
   private scanner: VaultScanner;
   private viewMode: ViewMode = 'gtd';
   private layoutMode: LayoutMode = 'board';
+  private sortCriteria: SortCriteria = 'date';
+  private tagViewMode: TagViewMode = 'filter';
+  private activeFilterRoles: Set<RoleId> = new Set([
+    'role/yo-manager',
+    'role/josef-selfcare',
+    'role/rj-supportive',
+    'untagged'
+  ]);
+  private collapsedSwimlanes: Set<RoleId> = new Set();
   private searchQuery = '';
   private activeChip: 'all' | 'urgent' | 'important' | 'projects' = 'all';
   private selectedFolder = 'all';
@@ -111,6 +167,11 @@ export class GTDMatrixView extends ItemView {
     if (settings) {
       this.layoutMode = settings.defaultLayoutMode;
       this.viewMode = settings.defaultViewMode;
+      this.sortCriteria = settings.defaultSortCriteria || 'date';
+      this.tagViewMode = settings.defaultTagViewMode || 'filter';
+      if (settings.activeFilterRoles && settings.activeFilterRoles.length > 0) {
+        this.activeFilterRoles = new Set(settings.activeFilterRoles as RoleId[]);
+      }
     }
   }
 
@@ -171,6 +232,9 @@ export class GTDMatrixView extends ItemView {
 
     // Filter Tasks
     const filteredTasks = tasks.filter((t) => {
+      // 1. Role Filter
+      if (!this.activeFilterRoles.has(t.effectiveRole)) return false;
+
       if (this.searchQuery) {
         const q = this.searchQuery.toLowerCase();
         const matchesText = t.description.toLowerCase().includes(q);
@@ -196,8 +260,19 @@ export class GTDMatrixView extends ItemView {
       return true;
     });
 
-    // Group tasks according to active View Mode
     const activeSections = this.viewMode === 'gtd' ? GTD_SECTIONS : EISENHOWER_SECTIONS;
+
+    // Render Swimlanes
+    if (this.tagViewMode === 'swimlanes') {
+      if (this.layoutMode === 'board') {
+        this.renderSwimlaneBoard(container, activeSections, filteredTasks, todayStr);
+      } else {
+        this.renderSwimlaneList(container, activeSections, filteredTasks, todayStr);
+      }
+      return;
+    }
+
+    // Group tasks according to active View Mode (Filter Mode)
     const grouped = new Map<SectionId, TaskItem[]>();
     for (const sec of activeSections) {
       grouped.set(sec.id, []);
@@ -253,6 +328,31 @@ export class GTDMatrixView extends ItemView {
       }
     });
 
+    // Tag / Role View Mode Toggle [Filter | Swimlanes]
+    const tagModeGroup = toolbar.createDiv({ cls: 'gtd-mode-switcher gtd-tagmode-switcher' });
+    const filterBtn = tagModeGroup.createEl('button', {
+      cls: `gtd-mode-btn ${this.tagViewMode === 'filter' ? 'is-active' : ''}`,
+      text: 'Filter'
+    });
+    filterBtn.title = 'Filter view: display matching tasks in standard columns';
+    filterBtn.addEventListener('click', () => {
+      if (this.tagViewMode !== 'filter') {
+        this.tagViewMode = 'filter';
+        this.render();
+      }
+    });
+    const swimlanesBtn = tagModeGroup.createEl('button', {
+      cls: `gtd-mode-btn ${this.tagViewMode === 'swimlanes' ? 'is-active' : ''}`,
+      text: 'Swimlanes'
+    });
+    swimlanesBtn.title = 'Swimlane view: divide board horizontally by role';
+    swimlanesBtn.addEventListener('click', () => {
+      if (this.tagViewMode !== 'swimlanes') {
+        this.tagViewMode = 'swimlanes';
+        this.render();
+      }
+    });
+
     // Layout Toggle (Board / List)
     const layoutGroup = toolbar.createDiv({ cls: 'gtd-layout-switcher' });
     const boardBtn = layoutGroup.createEl('button', {
@@ -277,6 +377,51 @@ export class GTDMatrixView extends ItemView {
         this.render();
       }
     });
+
+    // Sort Dropdown
+    const sortWrapper = toolbar.createDiv({ cls: 'gtd-sort-wrapper' });
+    const sortSelect = sortWrapper.createEl('select', { cls: 'gtd-sort-select' });
+    const sortOptions: { id: SortCriteria; label: string }[] = [
+      { id: 'date', label: 'Sort: Date (Earliest)' },
+      { id: 'priority', label: 'Sort: Priority (Highest)' },
+      { id: 'title', label: 'Sort: Title (A-Z)' },
+      { id: 'created', label: 'Sort: Created (Newest)' }
+    ];
+    for (const opt of sortOptions) {
+      const optionEl = sortSelect.createEl('option', { value: opt.id, text: opt.label });
+      if (this.sortCriteria === opt.id) optionEl.selected = true;
+    }
+    sortSelect.addEventListener('change', () => {
+      this.sortCriteria = sortSelect.value as SortCriteria;
+      this.render();
+    });
+
+    // Role Filter Chips Row
+    const roleChipsWrapper = toolbar.createDiv({ cls: 'gtd-role-chips-wrapper' });
+    const roleList: { id: RoleId; label: string }[] = [
+      { id: 'role/yo-manager', label: 'Yo Manager' },
+      { id: 'role/josef-selfcare', label: 'Josef Self-Care' },
+      { id: 'role/rj-supportive', label: 'RJ Supportive' },
+      { id: 'untagged', label: 'Untagged' }
+    ];
+    for (const r of roleList) {
+      const isActive = this.activeFilterRoles.has(r.id);
+      const pill = roleChipsWrapper.createEl('button', {
+        cls: `gtd-role-chip-btn ${isActive ? 'is-active' : ''} chip-${r.id.replace('/', '-')}`,
+        text: r.label
+      });
+      pill.title = isActive ? `Exclude ${r.label}` : `Include ${r.label}`;
+      pill.addEventListener('click', () => {
+        if (this.activeFilterRoles.has(r.id)) {
+          if (this.activeFilterRoles.size > 1) {
+            this.activeFilterRoles.delete(r.id);
+          }
+        } else {
+          this.activeFilterRoles.add(r.id);
+        }
+        this.render();
+      });
+    }
 
     // Search bar
     const searchWrapper = toolbar.createDiv({ cls: 'gtd-search-wrapper' });
@@ -397,14 +542,7 @@ export class GTDMatrixView extends ItemView {
       });
 
       // Sort tasks
-      const sorted = [...colTasks].sort((a, b) => {
-        const dateA = a.scheduledDate || a.dueDate;
-        const dateB = b.scheduledDate || b.dueDate;
-        if (dateA && dateB) return dateA.localeCompare(dateB);
-        if (dateA && !dateB) return -1;
-        if (!dateA && dateB) return 1;
-        return a.fileName.localeCompare(b.fileName);
-      });
+      const sorted = sortTasks(colTasks, this.sortCriteria);
 
       if (sorted.length === 0) {
         dropZone.createDiv({ cls: 'gtd-board-empty', text: 'Drop a task here' });
@@ -477,8 +615,22 @@ export class GTDMatrixView extends ItemView {
       this.makeEditable(descEl, task);
     });
 
-    // Meta row: dates + source file
+    // Meta row: dates + source file + role badge
     const metaEl = card.createDiv({ cls: 'gtd-board-card-meta' });
+
+    // Role badge
+    if (task.effectiveRole && task.effectiveRole !== 'untagged') {
+      const roleBadge = metaEl.createSpan({
+        cls: `gtd-role-badge badge-${task.effectiveRole.replace('/', '-')}`,
+        text:
+          task.effectiveRole === 'role/yo-manager'
+            ? 'Yo Manager'
+            : task.effectiveRole === 'role/josef-selfcare'
+            ? 'Josef Self-Care'
+            : 'RJ Supportive'
+      });
+      roleBadge.title = `Role source: ${task.roleSource}`;
+    }
 
     if (task.scheduledDate) {
       const isOverdue = !task.isCompleted && task.scheduledDate < today;
@@ -509,7 +661,8 @@ export class GTDMatrixView extends ItemView {
   private renderSection(
     container: HTMLElement,
     sec: SectionDefinition,
-    tasks: TaskItem[]
+    tasks: TaskItem[],
+    roleTag?: string | null
   ): void {
     const isCollapsed = this.collapsedSections.has(sec.id);
     const sectionEl = container.createDiv({
@@ -567,6 +720,11 @@ export class GTDMatrixView extends ItemView {
       const task = this.scanner.getTasks().find((t) => t.id === taskId);
       if (!task) return;
 
+      // Role mutation if dropped in swimlane list
+      if (roleTag !== undefined && task.effectiveRole !== (roleTag || 'untagged')) {
+        await this.scanner.setRole(task, (roleTag as RoleId) || null);
+      }
+
       await this.handleTaskDrop(task, sec.id);
     });
 
@@ -580,21 +738,195 @@ export class GTDMatrixView extends ItemView {
           text: 'No tasks here. Drop a task or add one below.'
         });
       } else {
-        const sorted = [...tasks].sort((a, b) => {
-          const dateA = a.scheduledDate || a.dueDate;
-          const dateB = b.scheduledDate || b.dueDate;
-          if (dateA && dateB) return dateA.localeCompare(dateB);
-          if (dateA && !dateB) return -1;
-          if (!dateA && dateB) return 1;
-          return a.fileName.localeCompare(b.fileName);
-        });
+        const sorted = sortTasks(tasks, this.sortCriteria);
 
         for (const task of sorted) {
           this.renderTaskItem(bodyEl, task);
         }
       }
 
-      this.renderQuickAddRow(bodyEl, sec.id);
+      this.renderQuickAddRow(bodyEl, sec.id, roleTag);
+    }
+  }
+
+  private renderSwimlaneBoard(
+    container: HTMLElement,
+    sections: SectionDefinition[],
+    tasks: TaskItem[],
+    todayStr: string
+  ): void {
+    const swimlanesContainer = container.createDiv({ cls: 'gtd-swimlanes-container' });
+
+    for (const lane of ROLE_SWIMLANES) {
+      if (!this.activeFilterRoles.has(lane.id)) continue;
+
+      const laneTasks = tasks.filter((t) => t.effectiveRole === lane.id);
+      if (lane.id === 'untagged' && laneTasks.length === 0) continue;
+
+      const isCollapsed = this.collapsedSwimlanes.has(lane.id);
+      const laneEl = swimlanesContainer.createDiv({
+        cls: `gtd-swimlane-row ${lane.badgeClass} ${isCollapsed ? 'is-collapsed' : ''}`
+      });
+
+      // Swimlane Header Bar
+      const laneHeader = laneEl.createDiv({ cls: 'gtd-swimlane-header' });
+      const toggleIcon = laneHeader.createSpan({ cls: 'gtd-toggle-icon' });
+      setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+
+      const iconSpan = laneHeader.createSpan({ cls: 'gtd-swimlane-icon' });
+      setIcon(iconSpan, lane.icon);
+
+      const titleGroup = laneHeader.createDiv({ cls: 'gtd-swimlane-title-group' });
+      titleGroup.createSpan({ cls: 'gtd-swimlane-title', text: lane.title });
+      titleGroup.createSpan({ cls: 'gtd-count-badge', text: String(laneTasks.length) });
+
+      laneHeader.createDiv({ cls: 'gtd-swimlane-subtitle', text: lane.subtitle });
+
+      laneHeader.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+        if (this.collapsedSwimlanes.has(lane.id)) {
+          this.collapsedSwimlanes.delete(lane.id);
+        } else {
+          this.collapsedSwimlanes.add(lane.id);
+        }
+        this.render();
+      });
+
+      if (isCollapsed) continue;
+
+      // Group lane tasks by section
+      const laneGrouped = new Map<SectionId, TaskItem[]>();
+      for (const sec of sections) {
+        laneGrouped.set(sec.id, []);
+      }
+      for (const t of laneTasks) {
+        const secId =
+          this.viewMode === 'gtd'
+            ? getGTDSection(t, todayStr)
+            : getEisenhowerSection(t, todayStr);
+        if (secId) {
+          laneGrouped.get(secId)?.push(t);
+        }
+      }
+
+      // Board Grid inside swimlane
+      const grid = laneEl.createDiv({ cls: 'gtd-board gtd-swimlane-board' });
+      for (const sec of sections) {
+        const colTasks = laneGrouped.get(sec.id) || [];
+        const col = grid.createDiv({ cls: `gtd-board-column ${sec.badgeClass}` });
+
+        // Column header
+        const colHeader = col.createDiv({ cls: 'gtd-board-col-header' });
+        const colIcon = colHeader.createSpan({ cls: 'gtd-board-col-icon' });
+        setIcon(colIcon, sec.icon);
+        colHeader.createSpan({ cls: 'gtd-board-col-title', text: sec.title });
+        colHeader.createSpan({ cls: 'gtd-count-badge', text: String(colTasks.length) });
+
+        // Drop zone
+        const dropZone = col.createDiv({ cls: 'gtd-board-drop-zone' });
+        dropZone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+          dropZone.addClass('gtd-drag-over');
+        });
+        dropZone.addEventListener('dragleave', () => {
+          dropZone.removeClass('gtd-drag-over');
+        });
+        dropZone.addEventListener('drop', async (e) => {
+          e.preventDefault();
+          dropZone.removeClass('gtd-drag-over');
+          const taskId = e.dataTransfer?.getData('text/plain');
+          if (!taskId) return;
+          const task = this.scanner.getTasks().find((t) => t.id === taskId);
+          if (!task) return;
+
+          // Cross-swimlane role mutation
+          if (task.effectiveRole !== lane.id) {
+            await this.scanner.setRole(task, (lane.roleTag as RoleId) || null);
+          }
+          await this.handleTaskDrop(task, sec.id);
+        });
+
+        const sorted = sortTasks(colTasks, this.sortCriteria);
+        if (sorted.length === 0) {
+          dropZone.createDiv({ cls: 'gtd-board-empty', text: 'Drop a task here' });
+        } else {
+          for (const task of sorted) {
+            this.renderBoardCard(dropZone, task);
+          }
+        }
+
+        // Quick add inside column with swimlane role
+        this.renderQuickAddRow(col, sec.id, lane.roleTag);
+      }
+    }
+  }
+
+  private renderSwimlaneList(
+    container: HTMLElement,
+    sections: SectionDefinition[],
+    tasks: TaskItem[],
+    todayStr: string
+  ): void {
+    const wrapper = container.createDiv({ cls: 'gtd-swimlanes-list-wrapper' });
+
+    for (const lane of ROLE_SWIMLANES) {
+      if (!this.activeFilterRoles.has(lane.id)) continue;
+
+      const laneTasks = tasks.filter((t) => t.effectiveRole === lane.id);
+      if (lane.id === 'untagged' && laneTasks.length === 0) continue;
+
+      const isCollapsed = this.collapsedSwimlanes.has(lane.id);
+      const laneEl = wrapper.createDiv({
+        cls: `gtd-swimlane-list-group ${lane.badgeClass} ${isCollapsed ? 'is-collapsed' : ''}`
+      });
+
+      // Role Header
+      const headerEl = laneEl.createDiv({ cls: 'gtd-swimlane-list-header' });
+      const toggleIcon = headerEl.createSpan({ cls: 'gtd-toggle-icon' });
+      setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+
+      const iconSpan = headerEl.createSpan({ cls: 'gtd-swimlane-icon' });
+      setIcon(iconSpan, lane.icon);
+
+      const titleGroup = headerEl.createDiv({ cls: 'gtd-swimlane-title-group' });
+      titleGroup.createSpan({ cls: 'gtd-swimlane-title', text: lane.title });
+      titleGroup.createSpan({ cls: 'gtd-count-badge', text: String(laneTasks.length) });
+
+      headerEl.createDiv({ cls: 'gtd-swimlane-subtitle', text: lane.subtitle });
+
+      headerEl.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+        if (this.collapsedSwimlanes.has(lane.id)) {
+          this.collapsedSwimlanes.delete(lane.id);
+        } else {
+          this.collapsedSwimlanes.add(lane.id);
+        }
+        this.render();
+      });
+
+      if (isCollapsed) continue;
+
+      // Group lane tasks by section
+      const laneGrouped = new Map<SectionId, TaskItem[]>();
+      for (const sec of sections) {
+        laneGrouped.set(sec.id, []);
+      }
+      for (const t of laneTasks) {
+        const secId =
+          this.viewMode === 'gtd'
+            ? getGTDSection(t, todayStr)
+            : getEisenhowerSection(t, todayStr);
+        if (secId) {
+          laneGrouped.get(secId)?.push(t);
+        }
+      }
+
+      const bodyEl = laneEl.createDiv({ cls: 'gtd-swimlane-list-body' });
+      for (const sec of sections) {
+        const secTasks = laneGrouped.get(sec.id) || [];
+        this.renderSection(bodyEl, sec, secTasks, lane.roleTag);
+      }
     }
   }
 
@@ -772,9 +1104,23 @@ export class GTDMatrixView extends ItemView {
         sourcePath: ''
       });
     });
+
+    // Role badge
+    if (task.effectiveRole && task.effectiveRole !== 'untagged') {
+      const roleBadge = metaEl.createSpan({
+        cls: `gtd-role-badge badge-${task.effectiveRole.replace('/', '-')}`,
+        text:
+          task.effectiveRole === 'role/yo-manager'
+            ? 'Yo Manager'
+            : task.effectiveRole === 'role/josef-selfcare'
+            ? 'Josef Self-Care'
+            : 'RJ Supportive'
+      });
+      roleBadge.title = `Role source: ${task.roleSource}`;
+    }
   }
 
-  private renderQuickAddRow(container: HTMLElement, secId: SectionId): void {
+  private renderQuickAddRow(container: HTMLElement, secId: SectionId, roleTag?: string | null): void {
     const quickAddEl = container.createDiv({ cls: 'gtd-quick-add-row' });
     const input = quickAddEl.createEl('input', {
       type: 'text',
@@ -786,7 +1132,7 @@ export class GTDMatrixView extends ItemView {
       if (e.key === 'Enter' && input.value.trim()) {
         const text = input.value.trim();
         input.value = '';
-        await this.scanner.quickAddTask(secId, text);
+        await this.scanner.quickAddTask(secId, text, (roleTag as RoleId) || null);
       }
     });
   }
