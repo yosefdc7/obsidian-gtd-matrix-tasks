@@ -178,8 +178,8 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     cls: `gtd-row-check ${task.isCompleted ? 'is-checked' : ''}`,
     attr: { 'aria-label': task.isCompleted ? 'Mark incomplete (Ctrl+click for status menu)' : 'Complete task (Ctrl+click for status menu)' }
   });
-  // Uncompleted → empty circle ring; Completed → filled check circle
-  setIcon(checkBtn, task.isCompleted ? 'check' : 'circle');
+  // Completed → filled check icon; Uncompleted → CSS ring only (no icon needed)
+  if (task.isCompleted) setIcon(checkBtn, 'check');
   checkBtn.title = task.isCompleted
     ? 'Click to uncomplete · Ctrl+click for status menu'
     : 'Click to complete · Ctrl+click for status menu';
