@@ -1,6 +1,6 @@
 import { setIcon } from 'obsidian';
 import type { ViewContext } from './types';
-import type { RoleId, SortCriteria, TaskItem } from '../types';
+import type { DateAnchorField, RoleId, SortCriteria, TaskItem } from '../types';
 
 function getUniqueFolders(tasks: TaskItem[]): string[] {
   const set = new Set<string>();
@@ -40,30 +40,65 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
     }
   });
 
-  // Tag / Role View Mode Toggle [Filter | Swimlanes]
-  const tagModeGroup = toolbar.createDiv({ cls: 'gtd-mode-switcher gtd-tagmode-switcher' });
-  const filterBtn = tagModeGroup.createEl('button', {
-    cls: `gtd-mode-btn ${state.tagViewMode === 'filter' ? 'is-active' : ''}`,
-    text: 'Filter'
+  const dateBtn = modeGroup.createEl('button', {
+    cls: `gtd-mode-btn ${state.viewMode === 'date' ? 'is-active' : ''}`,
+    text: 'By Date'
   });
-  filterBtn.title = 'Filter view: display matching tasks in standard columns';
-  filterBtn.addEventListener('click', () => {
-    if (state.tagViewMode !== 'filter') {
-      ctx.setState({ tagViewMode: 'filter' });
-    }
-  });
-  const swimlanesBtn = tagModeGroup.createEl('button', {
-    cls: `gtd-mode-btn ${state.tagViewMode === 'swimlanes' ? 'is-active' : ''}`,
-    text: 'Swimlanes'
-  });
-  swimlanesBtn.title = 'Swimlane view: divide board horizontally by role';
-  swimlanesBtn.addEventListener('click', () => {
-    if (state.tagViewMode !== 'swimlanes') {
-      ctx.setState({ tagViewMode: 'swimlanes' });
+  dateBtn.title = 'By Date: tasks grouped into date buckets by anchor date';
+  dateBtn.addEventListener('click', () => {
+    if (state.viewMode !== 'date') {
+      ctx.setState({ viewMode: 'date' });
     }
   });
 
-  // Layout Toggle (Board / List)
+  // Anchor field selector (By Date only); session-only, defaults to Scheduled
+  if (state.viewMode === 'date') {
+    const anchorGroup = toolbar.createDiv({ cls: 'gtd-mode-switcher gtd-anchor-switcher' });
+    const anchors: { id: DateAnchorField; label: string }[] = [
+      { id: 'start', label: 'Start' },
+      { id: 'scheduled', label: 'Scheduled' },
+      { id: 'due', label: 'Due' }
+    ];
+    for (const anchor of anchors) {
+      const anchorBtn = anchorGroup.createEl('button', {
+        cls: `gtd-mode-btn ${state.dateAnchor === anchor.id ? 'is-active' : ''}`,
+        text: anchor.label
+      });
+      anchorBtn.title = `Position tasks by their ${anchor.label.toLowerCase()} date`;
+      anchorBtn.addEventListener('click', () => {
+        if (ctx.getState().dateAnchor !== anchor.id) {
+          ctx.setState({ dateAnchor: anchor.id });
+        }
+      });
+    }
+  }
+
+  // Tag / Role View Mode Toggle [Filter | Swimlanes] — hidden while By Date is active
+  if (state.viewMode !== 'date') {
+    const tagModeGroup = toolbar.createDiv({ cls: 'gtd-mode-switcher gtd-tagmode-switcher' });
+    const filterBtn = tagModeGroup.createEl('button', {
+      cls: `gtd-mode-btn ${state.tagViewMode === 'filter' ? 'is-active' : ''}`,
+      text: 'Filter'
+    });
+    filterBtn.title = 'Filter view: display matching tasks in standard columns';
+    filterBtn.addEventListener('click', () => {
+      if (state.tagViewMode !== 'filter') {
+        ctx.setState({ tagViewMode: 'filter' });
+      }
+    });
+    const swimlanesBtn = tagModeGroup.createEl('button', {
+      cls: `gtd-mode-btn ${state.tagViewMode === 'swimlanes' ? 'is-active' : ''}`,
+      text: 'Swimlanes'
+    });
+    swimlanesBtn.title = 'Swimlane view: divide board horizontally by role';
+    swimlanesBtn.addEventListener('click', () => {
+      if (state.tagViewMode !== 'swimlanes') {
+        ctx.setState({ tagViewMode: 'swimlanes' });
+      }
+    });
+  }
+
+  // Layout Toggle (Board / List) — persists into settings.defaultLayoutMode
   const layoutGroup = toolbar.createDiv({ cls: 'gtd-layout-switcher' });
   const boardBtn = layoutGroup.createEl('button', {
     cls: `gtd-layout-btn ${state.layoutMode === 'board' ? 'is-active' : ''}`,
@@ -72,6 +107,8 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
   setIcon(boardBtn, 'layout-dashboard');
   boardBtn.addEventListener('click', () => {
     if (state.layoutMode !== 'board') {
+      ctx.settings.defaultLayoutMode = 'board';
+      void ctx.saveSettings();
       ctx.setState({ layoutMode: 'board' });
     }
   });
@@ -82,6 +119,8 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
   setIcon(listBtn, 'list');
   listBtn.addEventListener('click', () => {
     if (state.layoutMode !== 'list') {
+      ctx.settings.defaultLayoutMode = 'list';
+      void ctx.saveSettings();
       ctx.setState({ layoutMode: 'list' });
     }
   });

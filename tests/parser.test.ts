@@ -8,6 +8,7 @@ import {
   setTaskDescription,
   setTaskWaiting,
   setTaskSomeday,
+  setTaskStartDate,
   getGTDSection,
   getEisenhowerSection
 } from '../src/parser';
@@ -80,6 +81,18 @@ describe('Task Mutators', () => {
     expect(updated).toBe('- [ ] Prepare quarterly review ⏳ 2026-09-25');
 
     const cleared = setTaskScheduledDate(updated, null);
+    expect(cleared).toBe('- [ ] Prepare quarterly review');
+  });
+
+  it('sets, replaces, and clears start date on task line', () => {
+    const line = '- [ ] Prepare quarterly review';
+    const start = setTaskStartDate(line, '2026-09-17');
+    expect(start).toBe('- [ ] Prepare quarterly review 🛫 2026-09-17');
+
+    const updated = setTaskStartDate(start, '2026-09-19');
+    expect(updated).toBe('- [ ] Prepare quarterly review 🛫 2026-09-19');
+
+    const cleared = setTaskStartDate(updated, null);
     expect(cleared).toBe('- [ ] Prepare quarterly review');
   });
 });

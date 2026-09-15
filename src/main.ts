@@ -24,7 +24,8 @@ export default class GTDMatrixPlugin extends Plugin {
 
     this.registerView(
       VIEW_TYPE_GTD_MATRIX,
-      (leaf: WorkspaceLeaf) => new GTDMatrixView(leaf, this.scanner, this.settings)
+      (leaf: WorkspaceLeaf) =>
+        new GTDMatrixView(leaf, this.scanner, this.settings, () => this.saveSettings())
     );
 
     this.addRibbonIcon('list-todo', 'Open GTD Matrix Tasks', () => {

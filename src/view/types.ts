@@ -1,5 +1,6 @@
 import type { App, Component } from 'obsidian';
 import type {
+  DateAnchorField,
   LayoutMode,
   PluginSettings,
   RoleId,
@@ -148,6 +149,8 @@ export interface ViewState {
   layoutMode: LayoutMode;
   sortCriteria: SortCriteria;
   tagViewMode: TagViewMode;
+  /** By Date anchor field; session-only, defaults to Scheduled. */
+  dateAnchor: DateAnchorField;
   activeFilterRoles: Set<RoleId>;
   collapsedSwimlanes: Set<RoleId>;
   searchQuery: string;
@@ -171,7 +174,12 @@ export interface ViewContext {
   setState(partial: Partial<ViewState>): void;
   render(): void;
   handleTaskDrop(task: TaskItem, targetSection: SectionId, roleTag?: RoleId | null): Promise<void>;
+  /** By Date day-bucket drop: sets the anchor field's date (scheduling gesture). */
+  handleDateDrop(task: TaskItem, dayDate: string): Promise<void>;
   openQuickAddModal(sectionId?: SectionId): void;
+  /** Quick-add dated to a specific day, honoring the live anchor field. */
+  quickAddToDate(text: string, dayDate: string): Promise<void>;
   getTodayDateString(): string;
   rescan(): Promise<void>;
+  saveSettings(): Promise<void>;
 }

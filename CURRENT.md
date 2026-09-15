@@ -1,45 +1,44 @@
 # Current Work — obsidian-gtd-matrix-tasks
 
 ## Objective
-Decompose the two architectural hotspots of this plugin per ADR 0005 (`2nd Brain/docs/adr/0005-storage-read-write-and-view-decomposition.md`): the store layer (`src/vault-scanner.ts`) and the view layer (`src/view.ts`, 1,743 lines). Plan locked in the 2026-09-15 `/grill-with-docs` session (decision log recorded in `2nd Brain/CURRENT.md`).
+Deliver the three `/grill-with-docs`-approved enhancements (2026-09-15) on top of the ADR 0005 modular architecture: the **By Date** third view mode (ADR 0006), the icon-only color-coded priority button, and toolbar layout persistence into `settings.defaultLayoutMode` (ADR 0007). Docs: `2nd Brain/docs/adr/0006-by-date-view.md`, `0007-layout-toggle-persists-default.md`; domain terms (By Date, Anchor Date) in `2nd Brain/CONTEXT.md`.
 
 ## Status
-Stage C complete: view decomposition built, deployed to `2nd brain v7`, live-verified (renders + data-path + mobile carousel probes), and committed as `27366fc` (`refactor: decompose view.ts into renderer modules`). Both ADR 0005 stages (store + view) are now executed.
+Implementation complete on the ADR 0005 modular renderers and live-verified against `2nd brain v7` (2,673-task store). Feature changes are **uncommitted** (16 modified + 2 new files); HEAD remains `a66f3a2` (Stage B/C decomposition committed: `a8a6731`, `27366fc`).
 
 ## Completed
-- Stage A: ADR 0005 amended (TaskFilter module, coordinator size 150–200, role folding); created this `CURRENT.md` and `AGENTS.md`.
-- Stage B: store decomposition deployed via `scripts/deploy-plugin.ps1` and verified live against the real vault — cold scan rendered 2,672 tasks / 6 columns; quick-add wrote to `Jots/2026/Sep/Sep 15 2026.md` (+1 store row); checkbox toggle wrote `- [x] … ✅ 2026-09-15` and revert stripped it; drag Inbox→Next Actions wrote `📅 2026-09-18`, drag back cleared it; test task removed (store back to 2,672); user's 10s typing check OK. Commit `a8a6731`.
-- Stage C: orphan drafts deleted; the 1,743-line `view.ts` re-extracted into `src/view/` — `types.ts` (ViewContext seam), pure `task-filter.ts` + `task-transitions.ts`, `task-menus.ts`, `card-renderer.ts`, `board-renderer.ts`, `list-renderer.ts`, `toolbar-renderer.ts`, `quick-capture-modal.ts`, and the 191-line `view/view.ts` coordinator. Old monolith deleted; `main.ts` import → `./view/view`. `tests/task-mutator.test.ts` (19 tests) added with `vitest.config.ts` aliasing the types-only `obsidian` npm package to `tests/__stubs__/obsidian.ts`. Committed `27366fc`.
+- ADR 0006 item 8 amended: the feature lands on the `src/view/` renderer modules (not the monolith), after Stage C (`27366fc`).
+- `src/view/date-buckets.ts` (new, pure, zero obsidian imports): `getAnchorDate` (chosen field, else Scheduled→Due→Start), `getDateBucketId`, `buildDateBuckets` (Past + 8 day buckets + Soon + Someday + Undated + Completed = 13), `groupByDateBucket` (per-bucket sort; all buckets pre-initialized).
+- By Date mode end-to-end: `ViewMode` gains `'date'`; mode switcher `[GTD Workflow] [Eisenhower Matrix] [By Date]`; session-only anchor switcher `[Start | Scheduled | Due]` (defaults Scheduled); Filter|Swimlanes toggle hidden while active; board (13 columns, day buckets as drop targets + quick-add, others "Empty" and drop-rejecting) and list (empty groups hidden except Completed Today) layouts; coordinator early-return date branch.
+- Date wiring: `TaskMutator.quickAddTaskDated` (stamps ⏳/📅/🛫 per anchor), `appendRawTask` extracted for daily-note create/append/reindex; `executeDateBucketDrop` (day-bucket drop = scheduling gesture, single `batchUpdateTaskLine`); `setStartDate` (🛫) + parser `setTaskStartDate`.
+- Priority button is now icon-only color-coded (`arrow-up-down`, tooltip + aria-label carry the text) in `card-renderer.ts` + CSS; start-date pills (`🛫`, `.gtd-date-start`) and date quick-add rows added; date bucket border colors per bucket class.
+- Layout persistence (ADR 0007): Board/List toggle writes `settings.defaultLayoutMode` + `saveSettings()`; settings tab "Default view mode" gains the By Date option.
+- Wired through the modular seam: `toolbar-renderer.ts`, `board-renderer.ts` (`renderDateBoard`), `list-renderer.ts` (`renderDateList`/`renderDateSection`), `card-renderer.ts`, `view/view.ts` (4th ctor arg `saveSettings`, `handleDateDrop`, `quickAddToDate`), `src/main.ts`.
 
-## Important Decisions (from grill-with-docs 2026-09-15)
-- Delete orphan view drafts; re-extract from `view.ts`. `src/view/types.ts` (ViewContext seam) and `task-transitions.ts` are written fresh to the ADR 0005 spec, not extracted.
-- Store checkpoint first: deploy → live data-path verify → commit alone. Then view decomposition; second deploy/verify/commit.
-- Extract pure `src/view/task-filter.ts` (filter + bucket + pre-sort), unit-tested without Obsidian mocks.
-- Transition parity table verified from live code; swimlane role changes fold into the single `batchUpdateTaskLine` write (undefined=preserve / id=set / null=clear); failed writes stay log-only.
-- Tests to add: `task-transitions` (exact output, date offsets, role matrix, exactly-one-call proof), `task-filter`, scoped `task-mutator` (minimal `vi.mock('obsidian')`).
-- Live verification at each checkpoint (data-path checks); full UI matrix + `dev:mobile` emulation at the end. Error bar: no gtd-attributed dev errors (ResizeObserver noise tolerated).
-- Facade wiring retained: `new GTDMatrixView(leaf, scanner, settings)`; ViewContext built from `scanner.store` / `scanner.mutator`.
-- Untagged conventional commits (`refactor: ...`), one per stage.
+## Important Decisions (full rationale in ADR 0006/0007)
+- Anchor Date ≠ Effective Date: chosen-field-first with Scheduled→Due→Start fallback, versus the GTD earliest-of-three Effective Date. Both documented in CONTEXT.md to prevent conflation.
+- Day buckets accept drops (set the anchor field's date) and quick-adds dated to the bucket; Past/Soon/Someday/Undated/Completed Today reject drops.
+- Completed tasks never enter date buckets; only ✅ = today renders in the trailing Completed Today group.
+- Soon spans +8→+90 days, mirroring the GTD 4–90d / >90d classification so both perspectives classify identically.
+- Priority icon-only: single `arrow-up-down` icon, color-coded by priority class; label text lives in tooltip + aria-label.
+- Layout persistence scope is layout only; view mode, sort, tag mode, and anchor field remain session state seeded from settings.
 
-## Changed Files
-- `src/vault-scanner.ts` — 123-line facade (committed `a8a6731`)
-- `src/store/task-store.ts`, `scan-engine.ts`, `task-mutator.ts`, `role-resolver.ts` (committed `a8a6731`)
-- `tests/task-store.test.ts` (committed `a8a6731`)
-- `src/view/` — 10 modules: `view.ts` (coordinator), `types.ts`, `task-filter.ts`, `task-transitions.ts`, `task-menus.ts`, `card-renderer.ts`, `board-renderer.ts`, `list-renderer.ts`, `toolbar-renderer.ts`, `quick-capture-modal.ts` (committed `27366fc`; old `src/view.ts` deleted)
-- `src/main.ts` — import switched to `./view/view` (committed `27366fc`)
-- `tests/task-filter.test.ts`, `tests/task-transitions.test.ts`, `tests/task-mutator.test.ts`, `tests/__stubs__/obsidian.ts`, `vitest.config.ts` (committed `27366fc`)
+## Changed Files (uncommitted)
+- New: `src/view/date-buckets.ts`, `tests/date-buckets.test.ts` (14 tests)
+- Modified: `src/types.ts` (ViewMode +'date', DateAnchorField), `src/parser.ts`, `src/main.ts`, `src/settings-tab.ts`, `src/store/task-mutator.ts`, `src/view/` (types, task-transitions, card-renderer, board-renderer, list-renderer, toolbar-renderer, view), `styles.css`
+- Tests modified: `tests/task-transitions.test.ts` (+5), `tests/task-mutator.test.ts` (+6), `tests/parser.test.ts` (+1)
 
 ## Verification
-- `npm test`: 132/132 passed (11 files, 2026-09-15 22:05). `tsc --noEmit`: clean (via `npm run build`).
-- Stage C live: `plugin:reload` + fresh leaf — GTD board 6 columns / 54 cards; swimlane board 4 lanes; list layout 6 sections; Eisenhower Q1 renders; quick-add wrote `- [ ] ZZ c8 test task` to the Sep 15 jot (+1 card); checkbox wrote `- [x] … ✅ 2026-09-15` (card moved to Completed); drag→Waiting wrote `- [?] ZZ c8 test task` (the ✅ residue when dropping a completed card matches the original code bug-for-bug — old transition also called only `setWaiting`); test task removed via vault API (back to 54 cards); `dev:errors` clean.
-- Mobile: `dev:mobile` emulation sets body classes only (no viewport resize) and smooth scroll animations pause on background leaves, so the carousel was probed with injected mobile CSS (removed after): tabs `display:flex`; tab click → `scrollIntoView` on the board carousel (`s=4879`) + `is-active` set; board scroll → active tab syncs after the 75ms debounce. Visual feel on a real phone remains a user-side pass.
+- `npm test`: 158/158 passed (12 files; 132 baseline + 26 new). `tsc --noEmit` exit 0. `npm run build` OK (main.js 80,810 B). Deployed via `scripts/deploy-plugin.ps1 -SkipBuild` to `2nd brain v7`.
+- Live (Obsidian CLI, real vault): By Date board renders 13 columns with correct titles/counts, anchor defaulting to Scheduled; Filter|Swimlanes toggle absent in By Date; priority badges 54/54 icon-only (SVG present, empty text, aria-label/title `Priority: … — click to change`); 5 start-date pills rendered.
+- Data paths (live, then cleaned up): quick-add into the Tomorrow bucket wrote `- [ ] … ⏳ 2026-09-16` to `Jots/2026/Sep/Sep 15 2026.md` (bucket 1→2); synthetic DOM drop onto the Thu bucket rewrote the token to `⏳ 2026-09-17` (counts 2→1 / 2→3); test line removed via vault API (0 marker hits, counts restored, DOM clean).
+- Layout persistence A/B (on-disk `data.json`): `list → board → list` matching the clicks; DOM toggled 8 list sections ↔ 13 board columns. Anchor switcher Scheduled→Due→Scheduled re-rendered; bucket counts identical under both anchors — correct: only 1 of 2,673 tasks has both ⏳ and 📅 (same date).
+- `dev:errors`: No errors captured after all interactions. Live view left in its found state (By Date, Scheduled anchor, List layout).
 - Note: after `plugin:reload`, stale leaves lose `contentEl`; detach them and open a fresh leaf before DOM checks.
-- Screenshot evidence (not inspected by agent — model cannot view images): `2nd Brain/stage-b-verify.png`.
 
 ## Next
-1. (Carryover) User visual pass on a real mobile device: swipe-tab carousel feel (functional logic already verified via the emulation probe).
-2. Keep commits untagged conventional.
+1. Commit the feature changes (untagged conventional, e.g. `feat: add By Date view, icon priority button, and layout persistence`).
+2. (Carryover) User visual pass on a real mobile device — By Date buckets + icon priority button feel.
 
 ## Blockers / Unknowns
-- Mobile carousel visual feel still needs a user-side pass on a real device; `dev:mobile` emulation can't resize the window (body-class only) and background-leaf smooth scrolling is paused.
-- ResizeObserver error noise (unknown origin) seen pre-reload; error log is clean post-reload — revisit only if it resurfaces.
+- None technical. Live vault data-path tests were fully cleaned up; only real-device visual feel remains user-side.

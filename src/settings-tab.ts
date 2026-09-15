@@ -23,6 +23,7 @@ export class GTDMatrixSettingTab extends PluginSettingTab {
         dropdown
           .addOption('gtd', 'GTD Workflow (6 stages)')
           .addOption('eisenhower', 'Eisenhower Matrix (4 quadrants)')
+          .addOption('date', 'By Date (date buckets)')
           .setValue(this.plugin.settings.defaultViewMode || 'gtd')
           .onChange(async (value) => {
             this.plugin.settings.defaultViewMode = value as ViewMode;

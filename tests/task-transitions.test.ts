@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { parseTaskLine } from '../src/parser';
-import { addDays, executeTaskTransition } from '../src/view/task-transitions';
+import { addDays, executeDateBucketDrop, executeTaskTransition } from '../src/view/task-transitions';
 import type { TaskMutator } from '../src/store/task-mutator';
-import { RoleId, SectionId, TaskItem, ViewMode } from '../src/types';
+import { DateAnchorField, RoleId, SectionId, TaskItem, ViewMode } from '../src/types';
 
 interface RunOptions {
   viewMode?: ViewMode;
@@ -135,6 +135,49 @@ describe('Eisenhower drop transitions', () => {
   it('Completed checks the box with the drop date', async () => {
     const { output } = await runTransition('- [ ] Do thing', 'eisen-completed', { viewMode: 'eisenhower' });
     expect(output).toBe('- [x] Do thing ✅ 2026-09-15');
+  });
+});
+
+describe('By Date day-bucket drops (scheduling gestures)', () => {
+  async function runDateDrop(line: string, anchorField: DateAnchorField, dayDate = '2026-09-18') {
+    const task = taskFrom(line);
+    const calls: ((line: string) => string)[] = [];
+    const mutator = {
+      batchUpdateTaskLine: async (_task: TaskItem, fn: (line: string) => string) => {
+        calls.push(fn);
+        return true;
+      }
+    } as unknown as TaskMutator;
+
+    await executeDateBucketDrop(task, dayDate, anchorField, mutator);
+    return { output: calls.map((fn) => fn(line)).join(' | '), callCount: calls.length };
+  }
+
+  it('Scheduled anchor stamps the ⏳ date in one write', async () => {
+    const { output, callCount } = await runDateDrop('- [ ] Review sprint plan', 'scheduled');
+    expect(output).toBe('- [ ] Review sprint plan ⏳ 2026-09-18');
+    expect(callCount).toBe(1);
+  });
+
+  it('Due anchor stamps the 📅 date', async () => {
+    const { output } = await runDateDrop('- [ ] Send invoice', 'due');
+    expect(output).toBe('- [ ] Send invoice 📅 2026-09-18');
+  });
+
+  it('Start anchor stamps the 🛫 date', async () => {
+    const { output } = await runDateDrop('- [ ] Draft proposal', 'start');
+    expect(output).toBe('- [ ] Draft proposal 🛫 2026-09-18');
+  });
+
+  it('replaces an existing date token instead of duplicating it', async () => {
+    const { output, callCount } = await runDateDrop('- [ ] Reschedule me ⏳ 2026-09-10', 'scheduled');
+    expect(output).toBe('- [ ] Reschedule me ⏳ 2026-09-18');
+    expect(callCount).toBe(1);
+  });
+
+  it('does not touch other date tokens or priority', async () => {
+    const { output } = await runDateDrop('- [ ] Keep me 📅 2026-10-01 ⏫', 'start');
+    expect(output).toBe('- [ ] Keep me 📅 2026-10-01 ⏫ 🛫 2026-09-18');
   });
 });
 

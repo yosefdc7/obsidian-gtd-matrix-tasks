@@ -1,6 +1,7 @@
 import { setIcon } from 'obsidian';
 import { getEisenhowerSection, getGTDSection, sortTasks } from '../parser';
-import { renderBoardCard, renderQuickAddRow } from './card-renderer';
+import { renderBoardCard, renderDateQuickAddRow, renderQuickAddRow } from './card-renderer';
+import type { DateBucketDefinition } from './date-buckets';
 import { ROLE_SWIMLANES } from './types';
 import type { ViewContext } from './types';
 import type { RoleId, SectionDefinition, SectionId, TaskItem } from '../types';
@@ -256,6 +257,130 @@ export function renderSwimlaneBoard(
 
       // Quick add inside column with swimlane role
       renderQuickAddRow(col, sec.id, lane.roleTag, ctx);
+    }
+  }
+}
+
+/** By Date board: chronological buckets; only day buckets accept drops and quick-adds. */
+export function renderDateBoard(
+  container: HTMLElement,
+  buckets: DateBucketDefinition[],
+  grouped: Map<string, TaskItem[]>,
+  ctx: ViewContext
+): void {
+  // Render mobile column tabs carousel
+  const tabsWrapper = container.createDiv({ cls: 'gtd-mobile-col-tabs' });
+  const tabButtons = new Map<string, HTMLButtonElement>();
+
+  for (const bucket of buckets) {
+    const colTasks = grouped.get(bucket.id) || [];
+    const tabBtn = tabsWrapper.createEl('button', {
+      cls: 'gtd-mobile-tab-btn',
+      attr: { 'data-target-section': bucket.id }
+    });
+    const iconSpan = tabBtn.createSpan({ cls: 'gtd-mobile-tab-icon' });
+    setIcon(iconSpan, bucket.icon);
+
+    const shortTitle = bucket.title.split('—')[0].trim();
+    tabBtn.createSpan({ cls: 'gtd-mobile-tab-label', text: shortTitle });
+    tabBtn.createSpan({ cls: 'gtd-count-badge', text: String(colTasks.length) });
+
+    tabBtn.addEventListener('click', () => {
+      const targetCol = board.querySelector(`[data-section-id="${bucket.id}"]`);
+      if (targetCol) {
+        targetCol.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+      tabButtons.forEach((btn) => btn.removeClass('is-active'));
+      tabBtn.addClass('is-active');
+    });
+
+    tabButtons.set(bucket.id, tabBtn);
+  }
+
+  if (buckets.length > 0) {
+    tabButtons.get(buckets[0].id)?.addClass('is-active');
+  }
+
+  const board = container.createDiv({ cls: 'gtd-board' });
+
+  // Sync horizontal scroll with mobile tabs
+  let scrollTimer: number | null = null;
+  board.addEventListener('scroll', () => {
+    if (scrollTimer) window.clearTimeout(scrollTimer);
+    scrollTimer = window.setTimeout(() => {
+      const boardRect = board.getBoundingClientRect();
+      const boardCenter = boardRect.left + boardRect.width / 2;
+      let closestId: string | null = null;
+      let minDistance = Infinity;
+
+      const cols = board.querySelectorAll<HTMLElement>('.gtd-board-column');
+      cols.forEach((col) => {
+        const rect = col.getBoundingClientRect();
+        const colCenter = rect.left + rect.width / 2;
+        const dist = Math.abs(colCenter - boardCenter);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestId = col.getAttribute('data-section-id');
+        }
+      });
+
+      if (closestId && tabButtons.has(closestId)) {
+        tabButtons.forEach((btn) => btn.removeClass('is-active'));
+        const activeBtn = tabButtons.get(closestId);
+        if (activeBtn) {
+          activeBtn.addClass('is-active');
+          activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+      }
+    }, 75);
+  });
+
+  for (const bucket of buckets) {
+    const colTasks = grouped.get(bucket.id) || [];
+    const col = board.createDiv({ cls: `gtd-board-column ${bucket.badgeClass}` });
+    col.setAttribute('data-section-id', bucket.id);
+
+    // Column header
+    const colHeader = col.createDiv({ cls: 'gtd-board-col-header' });
+    const iconSpan = colHeader.createSpan({ cls: 'gtd-board-col-icon' });
+    setIcon(iconSpan, bucket.icon);
+    colHeader.createSpan({ cls: 'gtd-board-col-title', text: bucket.title });
+    colHeader.createSpan({ cls: 'gtd-count-badge', text: String(colTasks.length) });
+
+    // Drop zone (day buckets only; other buckets reject drops)
+    const dropZone = col.createDiv({ cls: 'gtd-board-drop-zone' });
+    if (bucket.dayDate) {
+      const dayDate = bucket.dayDate;
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        dropZone.addClass('gtd-drag-over');
+      });
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.removeClass('gtd-drag-over');
+      });
+      dropZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        dropZone.removeClass('gtd-drag-over');
+        const taskId = e.dataTransfer?.getData('text/plain');
+        if (!taskId) return;
+        const task = ctx.taskStore.getTasks().find((t) => t.id === taskId);
+        if (!task) return;
+        await ctx.handleDateDrop(task, dayDate);
+      });
+    }
+
+    if (colTasks.length === 0) {
+      dropZone.createDiv({ cls: 'gtd-board-empty', text: bucket.dayDate ? 'Drop a task here' : 'Empty' });
+    } else {
+      for (const task of colTasks) {
+        renderBoardCard(dropZone, task, ctx);
+      }
+    }
+
+    // Quick-add inside day buckets only; stamps the anchor field with the bucket day
+    if (bucket.dayDate) {
+      renderDateQuickAddRow(col, bucket.dayDate, ctx);
     }
   }
 }

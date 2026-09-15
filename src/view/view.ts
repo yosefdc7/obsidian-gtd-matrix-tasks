@@ -2,11 +2,12 @@ import { ItemView, WorkspaceLeaf } from 'obsidian';
 import { VaultScanner } from '../vault-scanner';
 import { DEFAULT_SETTINGS } from '../types';
 import type { PluginSettings, RoleId, SectionId, TaskItem } from '../types';
-import { renderBoard, renderSwimlaneBoard } from './board-renderer';
-import { renderSection, renderSwimlaneList } from './list-renderer';
+import { renderBoard, renderDateBoard, renderSwimlaneBoard } from './board-renderer';
+import { buildDateBuckets, groupByDateBucket } from './date-buckets';
+import { renderDateList, renderSection, renderSwimlaneList } from './list-renderer';
 import { openQuickAddModal, renderFloatingActionButton } from './quick-capture-modal';
 import { filterTasks, groupBySection } from './task-filter';
-import { executeTaskTransition } from './task-transitions';
+import { executeDateBucketDrop, executeTaskTransition } from './task-transitions';
 import { renderToolbar } from './toolbar-renderer';
 import { EISENHOWER_SECTIONS, GTD_SECTIONS, VIEW_TYPE_GTD_MATRIX } from './types';
 import type { ViewContext, ViewState } from './types';
@@ -16,19 +17,27 @@ export { VIEW_TYPE_GTD_MATRIX };
 export class GTDMatrixView extends ItemView {
   private scanner: VaultScanner;
   private settings: PluginSettings;
+  private saveSettingsHandler?: () => Promise<void>;
   private viewState: ViewState;
   private unsubscribe: (() => void) | null = null;
   private ctxCache: ViewContext | null = null;
 
-  constructor(leaf: WorkspaceLeaf, scanner: VaultScanner, settings?: PluginSettings) {
+  constructor(
+    leaf: WorkspaceLeaf,
+    scanner: VaultScanner,
+    settings?: PluginSettings,
+    saveSettingsHandler?: () => Promise<void>
+  ) {
     super(leaf);
     this.scanner = scanner;
     this.settings = settings ?? DEFAULT_SETTINGS;
+    this.saveSettingsHandler = saveSettingsHandler;
     this.viewState = {
       viewMode: 'gtd',
       layoutMode: 'board',
       sortCriteria: 'date',
       tagViewMode: 'filter',
+      dateAnchor: 'scheduled',
       activeFilterRoles: new Set<RoleId>([
         'role/yo-manager',
         'role/josef-selfcare',
@@ -114,11 +123,14 @@ export class GTDMatrixView extends ItemView {
         render: () => this.render(),
         handleTaskDrop: (task, targetSection, roleTag) =>
           this.handleTaskDrop(task, targetSection, roleTag),
+        handleDateDrop: (task, dayDate) => this.handleDateDrop(task, dayDate),
         openQuickAddModal: (sectionId) => openQuickAddModal(this.ctx, sectionId),
+        quickAddToDate: (text, dayDate) => this.quickAddToDate(text, dayDate),
         getTodayDateString: () => this.scanner.getTodayDateString(),
         rescan: async () => {
           await this.scanner.scanVault();
-        }
+        },
+        saveSettings: () => this.saveSettingsHandler?.() ?? Promise.resolve()
       };
     }
     return this.ctxCache;
@@ -139,6 +151,16 @@ export class GTDMatrixView extends ItemView {
     );
   }
 
+  /** By Date day-bucket drop: sets the anchor field's date (scheduling gesture). */
+  private async handleDateDrop(task: TaskItem, dayDate: string): Promise<void> {
+    await executeDateBucketDrop(task, dayDate, this.viewState.dateAnchor, this.scanner.mutator);
+  }
+
+  /** Quick-add dated to a By Date day bucket, honoring the live anchor field. */
+  private async quickAddToDate(text: string, dayDate: string): Promise<void> {
+    await this.scanner.mutator.quickAddTaskDated(text, dayDate, this.viewState.dateAnchor, null);
+  }
+
   private render(): void {
     const container = this.contentEl;
     container.empty();
@@ -152,6 +174,24 @@ export class GTDMatrixView extends ItemView {
 
     // Filter Tasks
     const filteredTasks = filterTasks(tasks, this.viewState);
+
+    // By Date: third perspective with chronological buckets; no swimlanes
+    if (this.viewState.viewMode === 'date') {
+      const buckets = buildDateBuckets(todayStr);
+      const grouped = groupByDateBucket(
+        filteredTasks,
+        this.viewState.dateAnchor,
+        todayStr,
+        this.viewState.sortCriteria
+      );
+      if (this.viewState.layoutMode === 'board') {
+        renderDateBoard(container, buckets, grouped, this.ctx);
+      } else {
+        renderDateList(container, buckets, grouped, this.ctx);
+      }
+      renderFloatingActionButton(container, this.ctx);
+      return;
+    }
 
     const activeSections = this.viewState.viewMode === 'gtd' ? GTD_SECTIONS : EISENHOWER_SECTIONS;
 

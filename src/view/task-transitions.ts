@@ -1,9 +1,10 @@
-import { RoleId, SectionId, TaskItem, ViewMode } from '../types';
+import { DateAnchorField, RoleId, SectionId, TaskItem, ViewMode } from '../types';
 import {
   setTaskCompletion,
   setTaskDueDate,
-  setTaskPriority,
   setTaskScheduledDate,
+  setTaskStartDate,
+  setTaskPriority,
   setTaskSomeday,
   setTaskWaiting,
   setTaskRole
@@ -15,6 +16,29 @@ export function addDays(dateStr: string, days: number): string {
   const d = new Date(`${dateStr}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * By Date day-bucket drop: a scheduling gesture that sets the anchor field's
+ * date to the bucket day in a single atomic write (no GTD state change).
+ */
+export async function executeDateBucketDrop(
+  task: TaskItem,
+  dayDate: string,
+  anchorField: DateAnchorField,
+  mutator: TaskMutator
+): Promise<boolean> {
+  return mutator.batchUpdateTaskLine(task, (line) => {
+    switch (anchorField) {
+      case 'start':
+        return setTaskStartDate(line, dayDate);
+      case 'due':
+        return setTaskDueDate(line, dayDate);
+      case 'scheduled':
+      default:
+        return setTaskScheduledDate(line, dayDate);
+    }
+  });
 }
 
 /**

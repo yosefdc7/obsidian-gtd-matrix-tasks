@@ -201,6 +201,18 @@ describe('TaskMutator setters', () => {
     expect(vault.files.get('Tasks.md')).toBe('- [ ] Ship it\n');
   });
 
+  it('setStartDate stamps and clears the 🛫 date', async () => {
+    const { app, vault } = createMockApp({ 'Tasks.md': '- [ ] Ship it\n' });
+    const mutator = createMutator(app);
+    const task = createTask();
+
+    await mutator.setStartDate(task, '2026-09-17');
+    expect(vault.files.get('Tasks.md')).toBe('- [ ] Ship it 🛫 2026-09-17\n');
+
+    await mutator.setStartDate(task, null);
+    expect(vault.files.get('Tasks.md')).toBe('- [ ] Ship it\n');
+  });
+
   it('setPriority appends the priority emoji', async () => {
     const { app, vault } = createMockApp({ 'Tasks.md': '- [ ] Ship it\n' });
     const mutator = createMutator(app);
@@ -286,6 +298,58 @@ describe('TaskMutator.quickAddTask', () => {
     expect(vault.folders.has('Jots/2026')).toBe(true);
     expect(vault.folders.has('Jots/2026/Sep')).toBe(true);
     expect(reindexSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('TaskMutator.quickAddTaskDated', () => {
+  it('stamps the scheduled token for the scheduled anchor', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app);
+
+    await mutator.quickAddTaskDated('Prep deck', '2026-09-18', 'scheduled');
+
+    expect(vault.files.get(DAILY_PATH)).toBe('# 2026-09-15\n- [ ] Prep deck ⏳ 2026-09-18\n');
+    expect(reindexSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('stamps the due token for the due anchor', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app);
+
+    await mutator.quickAddTaskDated('Ship release', '2026-09-21', 'due');
+
+    expect(vault.files.get(DAILY_PATH)).toBe('# 2026-09-15\n- [ ] Ship release 📅 2026-09-21\n');
+  });
+
+  it('stamps the start token for the start anchor', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app);
+
+    await mutator.quickAddTaskDated('Kick off research', '2026-09-16', 'start');
+
+    expect(vault.files.get(DAILY_PATH)).toBe('# 2026-09-15\n- [ ] Kick off research 🛫 2026-09-16\n');
+  });
+
+  it('appends the role tag and created date when enabled', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app, { autoAddCreatedDate: true });
+
+    await mutator.quickAddTaskDated('Review PR', '2026-09-18', 'scheduled', 'role/yo-manager');
+
+    expect(vault.files.get(DAILY_PATH)).toBe(
+      `# 2026-09-15\n- [ ] Review PR ⏳ 2026-09-18 #role/yo-manager ➕ ${TODAY}\n`
+    );
+  });
+
+  it('creates the daily note and folders when missing', async () => {
+    const { app, vault } = createMockApp();
+    const mutator = createMutator(app);
+
+    const ok = await mutator.quickAddTaskDated('Plan sprint', '2026-09-18', 'scheduled');
+
+    expect(ok).toBe(true);
+    expect(vault.files.get(DAILY_PATH)).toBe(`# ${TODAY}\n\n## Tasks\n\n- [ ] Plan sprint ⏳ 2026-09-18\n`);
+    expect(vault.folders.has('Jots/2026/Sep')).toBe(true);
   });
 });
 

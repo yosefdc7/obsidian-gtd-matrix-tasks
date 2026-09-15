@@ -1,10 +1,11 @@
 import { App, TFile } from 'obsidian';
-import { TaskItem, TaskPriority, SectionId, PluginSettings, RoleId } from '../types';
+import { DateAnchorField, TaskItem, TaskPriority, SectionId, PluginSettings, RoleId } from '../types';
 import {
   setTaskPriority,
   setTaskCompletion,
   setTaskDueDate,
   setTaskScheduledDate,
+  setTaskStartDate,
   setTaskDescription,
   setTaskWaiting,
   setTaskSomeday,
@@ -109,6 +110,12 @@ export class TaskMutator {
     );
   }
 
+  public async setStartDate(task: TaskItem, startDate: string | null): Promise<boolean> {
+    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
+      setTaskStartDate(line, startDate)
+    );
+  }
+
   public async setDescription(task: TaskItem, newDescription: string): Promise<boolean> {
     return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
       setTaskDescription(line, newDescription)
@@ -134,9 +141,6 @@ export class TaskMutator {
   }
 
   public async quickAddTask(sectionId: SectionId, text: string, role?: RoleId | null): Promise<boolean> {
-    const dailyPath = this.getDailyNotePath();
-    let file = this.app.vault.getAbstractFileByPath(dailyPath);
-
     let isWaiting = false;
     let priority: TaskPriority = 'none';
     let extra = '';
@@ -182,6 +186,35 @@ export class TaskMutator {
     if (this.settings.autoAddCreatedDate) {
       rawTask += ` ➕ ${this.getTodayDateString()}`;
     }
+
+    return this.appendRawTask(rawTask);
+  }
+
+  /** Quick-add dated to a specific day (By Date day buckets), honoring the anchor field. */
+  public async quickAddTaskDated(
+    text: string,
+    dateStr: string,
+    anchorField: DateAnchorField,
+    role?: RoleId | null
+  ): Promise<boolean> {
+    const token = anchorField === 'start' ? '🛫' : anchorField === 'due' ? '📅' : '⏳';
+    let extra = ` ${token} ${dateStr}`;
+    if (role && role !== 'untagged') {
+      extra += ` #${role}`;
+    }
+
+    let rawTask = `- [ ] ${text.trim()}${extra}`;
+    if (this.settings.autoAddCreatedDate) {
+      rawTask += ` ➕ ${this.getTodayDateString()}`;
+    }
+
+    return this.appendRawTask(rawTask);
+  }
+
+  /** Appends a raw task line to today's daily note, creating file and folders when missing. */
+  private async appendRawTask(rawTask: string): Promise<boolean> {
+    const dailyPath = this.getDailyNotePath();
+    let file = this.app.vault.getAbstractFileByPath(dailyPath);
 
     if (!(file instanceof TFile)) {
       // Create folder if needed

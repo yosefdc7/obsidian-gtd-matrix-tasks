@@ -47,9 +47,10 @@ export function renderBoardCard(container: HTMLElement, task: TaskItem, ctx: Vie
 
   const priorityBtn = topRow.createEl('button', {
     cls: `gtd-priority-badge priority-${task.priority}`,
-    attr: { 'aria-label': 'Change priority' }
+    attr: { 'aria-label': `Priority: ${getPriorityLabel(task.priority)} — click to change` }
   });
-  priorityBtn.setText(getPriorityLabel(task.priority));
+  setIcon(priorityBtn, 'arrow-up-down');
+  priorityBtn.title = `Priority: ${getPriorityLabel(task.priority)}`;
   priorityBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     showPriorityMenu(e, task, ctx);
@@ -130,6 +131,12 @@ export function renderBoardCard(container: HTMLElement, task: TaskItem, ctx: Vie
       text: `📅 ${task.dueDate}`
     }).addEventListener('click', (e) => { e.stopPropagation(); showDueDatePicker(e.target as HTMLElement, task, ctx); });
   }
+  if (task.startDate) {
+    metaEl.createEl('button', {
+      cls: 'gtd-date-pill gtd-date-start',
+      text: `🛫 ${task.startDate}`
+    }).addEventListener('click', (e) => { e.stopPropagation(); showStartDatePicker(e.target as HTMLElement, task, ctx); });
+  }
 
   const fileLink = metaEl.createEl('a', {
     cls: `gtd-file-link ${task.isProject ? 'is-project-link' : ''}`,
@@ -177,12 +184,13 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     await ctx.taskMutator.setCompletion(task, checkbox.checked);
   });
 
-  // Priority color pill
+  // Priority color pill (icon-only; color and tooltip carry the level)
   const priorityBtn = itemEl.createEl('button', {
     cls: `gtd-priority-badge priority-${task.priority}`,
-    attr: { 'aria-label': 'Change priority' }
+    attr: { 'aria-label': `Priority: ${getPriorityLabel(task.priority)} — click to change` }
   });
-  priorityBtn.setText(getPriorityLabel(task.priority));
+  setIcon(priorityBtn, 'arrow-up-down');
+  priorityBtn.title = `Priority: ${getPriorityLabel(task.priority)}`;
   priorityBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     showPriorityMenu(e, task, ctx);
@@ -315,6 +323,19 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     duePill.addEventListener('click', (e) => {
       e.stopPropagation();
       showDueDatePicker(duePill, task, ctx);
+    });
+  }
+
+  // 3. Start Date Pill (🛫 if present)
+  if (task.startDate) {
+    const startPill = metaEl.createEl('button', {
+      cls: 'gtd-date-pill gtd-date-start',
+      text: `🛫 ${task.startDate}`
+    });
+    startPill.title = 'Click to change start date';
+    startPill.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showStartDatePicker(startPill, task, ctx);
     });
   }
 
@@ -467,6 +488,38 @@ function showDueDatePicker(anchor: HTMLElement, task: TaskItem, ctx: ViewContext
   });
 }
 
+function showStartDatePicker(anchor: HTMLElement, task: TaskItem, ctx: ViewContext): void {
+  const popover = createDiv({ cls: 'gtd-date-popover' });
+  const dateInput = popover.createEl('input', {
+    type: 'date',
+    cls: 'gtd-date-input',
+    value: task.startDate || ctx.getTodayDateString()
+  });
+
+  const clearBtn = popover.createEl('button', {
+    cls: 'gtd-btn-sm',
+    text: 'Clear'
+  });
+
+  anchor.parentElement?.appendChild(popover);
+  dateInput.focus();
+
+  dateInput.addEventListener('change', async () => {
+    await ctx.taskMutator.setStartDate(task, dateInput.value || null);
+    popover.remove();
+  });
+
+  clearBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await ctx.taskMutator.setStartDate(task, null);
+    popover.remove();
+  });
+
+  popover.addEventListener('mouseleave', () => {
+    popover.remove();
+  });
+}
+
 /** Per-column "+ Add task" input row; roleTag binds quick-added tasks to a swimlane. */
 export function renderQuickAddRow(
   container: HTMLElement,
@@ -486,6 +539,24 @@ export function renderQuickAddRow(
       const text = input.value.trim();
       input.value = '';
       await ctx.taskMutator.quickAddTask(secId, text, (roleTag as RoleId) || null);
+    }
+  });
+}
+
+/** Day-bucket quick-add row in the By Date view; the anchor field is stamped with the bucket day. */
+export function renderDateQuickAddRow(container: HTMLElement, dayDate: string, ctx: ViewContext): void {
+  const quickAddEl = container.createDiv({ cls: 'gtd-quick-add-row' });
+  const input = quickAddEl.createEl('input', {
+    type: 'text',
+    cls: 'gtd-quick-add-input',
+    placeholder: '+ Add task (press Enter)...'
+  });
+
+  input.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter' && input.value.trim()) {
+      const text = input.value.trim();
+      input.value = '';
+      await ctx.quickAddToDate(text, dayDate);
     }
   });
 }

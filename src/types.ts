@@ -1,9 +1,12 @@
 export type TaskPriority = 'highest' | 'high' | 'medium' | 'low' | 'lowest' | 'none';
 
-export type ViewMode = 'gtd' | 'eisenhower';
+export type ViewMode = 'gtd' | 'eisenhower' | 'date';
 export type LayoutMode = 'board' | 'list';
 export type SortCriteria = 'date' | 'priority' | 'title' | 'created';
 export type TagViewMode = 'filter' | 'swimlanes';
+
+/** Date field that positions a task in the By Date view. */
+export type DateAnchorField = 'start' | 'scheduled' | 'due';
 
 export type RoleId =
   | 'role/yo-manager'

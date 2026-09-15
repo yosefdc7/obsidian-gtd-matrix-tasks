@@ -181,6 +181,14 @@ export function setTaskScheduledDate(line: string, dateStr: string | null): stri
   return clean;
 }
 
+export function setTaskStartDate(line: string, dateStr: string | null): string {
+  let clean = line.replace(START_DATE_REGEX, '').replace(/[ \t]+$/, '').trimEnd();
+  if (dateStr) {
+    return `${clean} 🛫 ${dateStr}`;
+  }
+  return clean;
+}
+
 export function setTaskWaiting(line: string, waiting: boolean): string {
   const match = line.match(TASK_REGEX);
   if (!match) return line;

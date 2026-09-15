@@ -1,6 +1,8 @@
 import { setIcon } from 'obsidian';
 import { getEisenhowerSection, getGTDSection, sortTasks } from '../parser';
-import { renderQuickAddRow, renderTaskItem } from './card-renderer';
+import { renderDateQuickAddRow, renderQuickAddRow, renderTaskItem } from './card-renderer';
+import { DATE_BUCKET_COMPLETED } from './date-buckets';
+import type { DateBucketDefinition } from './date-buckets';
 import { ROLE_SWIMLANES } from './types';
 import type { ViewContext } from './types';
 import type { RoleId, SectionDefinition, SectionId, TaskItem } from '../types';
@@ -165,5 +167,87 @@ export function renderSwimlaneList(
       const secTasks = laneGrouped.get(sec.id) || [];
       renderSection(bodyEl, sec, secTasks, lane.roleTag, ctx);
     }
+  }
+}
+
+/** By Date list: accordion buckets; hides empty groups except Completed Today. */
+export function renderDateList(
+  container: HTMLElement,
+  buckets: DateBucketDefinition[],
+  grouped: Map<string, TaskItem[]>,
+  ctx: ViewContext
+): void {
+  const wrapper = container.createDiv({ cls: 'gtd-sections-wrapper' });
+  for (const bucket of buckets) {
+    const tasks = grouped.get(bucket.id) || [];
+    if (tasks.length === 0 && bucket.id !== DATE_BUCKET_COMPLETED) continue;
+    renderDateSection(wrapper, bucket, tasks, ctx);
+  }
+}
+
+function renderDateSection(
+  container: HTMLElement,
+  bucket: DateBucketDefinition,
+  tasks: TaskItem[],
+  ctx: ViewContext
+): void {
+  const sectionEl = container.createDiv({ cls: `gtd-section ${bucket.badgeClass}` });
+
+  // Header (static bucket icon; no collapse in By Date)
+  const headerEl = sectionEl.createDiv({ cls: 'gtd-section-header' });
+  const iconSpan = headerEl.createSpan({ cls: 'gtd-toggle-icon' });
+  setIcon(iconSpan, bucket.icon);
+
+  const titleGroup = headerEl.createDiv({ cls: 'gtd-title-group' });
+  titleGroup.createSpan({ cls: 'gtd-section-title', text: bucket.title });
+  titleGroup.createSpan({ cls: 'gtd-count-badge', text: String(tasks.length) });
+
+  headerEl.createDiv({ cls: 'gtd-section-subtitle', text: bucket.subtitle });
+
+  // Drop handling: day buckets accept drops (scheduling gesture); others reject
+  if (bucket.dayDate) {
+    const dayDate = bucket.dayDate;
+    sectionEl.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'move';
+      }
+      sectionEl.addClass('gtd-drag-over');
+    });
+
+    sectionEl.addEventListener('dragleave', () => {
+      sectionEl.removeClass('gtd-drag-over');
+    });
+
+    sectionEl.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      sectionEl.removeClass('gtd-drag-over');
+
+      const taskId = e.dataTransfer?.getData('text/plain');
+      if (!taskId) return;
+
+      const task = ctx.taskStore.getTasks().find((t) => t.id === taskId);
+      if (!task) return;
+
+      await ctx.handleDateDrop(task, dayDate);
+    });
+  }
+
+  // Body (tasks arrive pre-sorted from grouping)
+  const bodyEl = sectionEl.createDiv({ cls: 'gtd-section-body' });
+
+  if (tasks.length === 0) {
+    bodyEl.createDiv({
+      cls: 'gtd-empty-state',
+      text: 'No tasks here.'
+    });
+  } else {
+    for (const task of tasks) {
+      renderTaskItem(bodyEl, task, ctx);
+    }
+  }
+
+  if (bucket.dayDate) {
+    renderDateQuickAddRow(bodyEl, bucket.dayDate, ctx);
   }
 }
