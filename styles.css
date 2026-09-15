@@ -200,6 +200,40 @@
   gap: 8px;
 }
 
+/* Single tab row: view tabs + anchor tabs + ⚙ toggle on one line */
+.gtd-tab-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Push the options toggle to the far right */
+.gtd-tab-row > .gtd-options {
+  margin-left: auto;
+}
+
+/* Mobile: tabs stretch full width, anchor + toggle wrap to next line */
+@media (max-width: 540px) {
+  .gtd-tab-row {
+    row-gap: 6px;
+  }
+
+  .gtd-tab-row > .gtd-mode-switcher:first-child {
+    flex: 1 1 100%;
+    display: flex;
+  }
+
+  .gtd-tab-row > .gtd-mode-switcher:first-child .gtd-mode-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .gtd-tab-row > .gtd-options {
+    margin-left: auto;
+  }
+}
+
 .gtd-options-toggle {
   display: inline-flex;
   align-items: center;

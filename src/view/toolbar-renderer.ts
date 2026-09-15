@@ -61,8 +61,11 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
     }
   });
 
+  // Single tab row: [view tabs] [anchor tabs — By Date only] [⚙ options toggle]
+  const tabRow = toolbar.createDiv({ cls: 'gtd-tab-row' });
+
   // Segmented view tabs
-  const modeGroup = toolbar.createDiv({ cls: 'gtd-mode-switcher' });
+  const modeGroup = tabRow.createDiv({ cls: 'gtd-mode-switcher' });
   const gtdBtn = modeGroup.createEl('button', {
     cls: `gtd-mode-btn ${state.viewMode === 'gtd' ? 'is-active' : ''}`,
     text: 'GTD Workflow'
@@ -96,7 +99,7 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
 
   // Anchor field selector (By Date only); session-only, defaults to Scheduled
   if (state.viewMode === 'date') {
-    const anchorGroup = toolbar.createDiv({ cls: 'gtd-mode-switcher gtd-anchor-switcher' });
+    const anchorGroup = tabRow.createDiv({ cls: 'gtd-mode-switcher gtd-anchor-switcher' });
     const anchors: { id: DateAnchorField; label: string }[] = [
       { id: 'start', label: 'Start' },
       { id: 'scheduled', label: 'Scheduled' },
@@ -116,8 +119,8 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
     }
   }
 
-  // Options disclosure: layout, sort, Filter|Swimlanes, quick chips, folder, refresh
-  const optionsWrap = toolbar.createDiv({ cls: 'gtd-options' });
+  // Options disclosure toggle — pushed to far right of the tab row
+  const optionsWrap = tabRow.createDiv({ cls: 'gtd-options' });
   const optionsToggle = optionsWrap.createEl('button', {
     cls: `gtd-options-toggle ${state.optionsOpen ? 'is-active' : ''}`,
     attr: { 'aria-label': 'More options' }
@@ -128,8 +131,9 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
     ctx.setState({ optionsOpen: !ctx.getState().optionsOpen });
   });
 
-  const optionsRow = optionsWrap.createDiv({
+  const optionsRow = toolbar.createDiv({
     cls: `gtd-options-row ${state.optionsOpen ? '' : 'is-hidden'}`
+
   });
 
   // Layout Toggle (Board / List) — persists into settings.defaultLayoutMode
