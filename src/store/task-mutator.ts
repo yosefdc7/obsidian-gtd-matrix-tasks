@@ -4,6 +4,7 @@ import type { ParsedInput } from '../nl-input';
 import {
   setTaskPriority,
   setTaskCompletion,
+  setTaskStatusChar,
   setTaskDueDate,
   setTaskScheduledDate,
   setTaskStartDate,
@@ -96,6 +97,14 @@ export class TaskMutator {
     const today = this.getTodayDateString();
     return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
       setTaskCompletion(line, completed, today)
+    );
+  }
+
+  /** Set an arbitrary status character (space, x, /, -, ?) and sync the ✅ date. */
+  public async setStatus(task: TaskItem, newChar: string): Promise<boolean> {
+    const today = this.getTodayDateString();
+    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
+      setTaskStatusChar(line, newChar, today)
     );
   }
 

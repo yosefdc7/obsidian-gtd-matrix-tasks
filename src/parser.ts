@@ -165,6 +165,28 @@ export function setTaskCompletion(line: string, completed: boolean, dateStr?: st
   }
 }
 
+/**
+ * Set the raw status character inside `- [?]` to `newChar`, keeping the ✅
+ * completion date in sync (added when newChar === 'x', stripped otherwise).
+ */
+export function setTaskStatusChar(line: string, newChar: string, dateStr?: string): string {
+  const match = line.match(TASK_REGEX);
+  if (!match) return line;
+
+  const prefix = match[1];
+  const trailingBracket = match[3];
+  const body = match[4];
+
+  const newPrefix = `${prefix}${newChar}${trailingBracket}`;
+  const cleanBody = body.replace(COMPLETED_DATE_REGEX, '').trimEnd();
+
+  if (newChar === 'x') {
+    const d = dateStr || new Date().toISOString().slice(0, 10);
+    return `${newPrefix}${cleanBody} ✅ ${d}`;
+  }
+  return `${newPrefix}${cleanBody}`;
+}
+
 export function setTaskDueDate(line: string, dateStr: string | null): string {
   let clean = line.replace(DUE_DATE_REGEX, '').replace(/[ \t]+$/, '').trimEnd();
   if (dateStr) {

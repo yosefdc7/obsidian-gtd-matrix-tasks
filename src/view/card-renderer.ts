@@ -1,5 +1,5 @@
 import { MarkdownRenderer, setIcon } from 'obsidian';
-import { showMoveColumnMenu, showPriorityMenu, showTaskActionMenu } from './task-menus';
+import { showMoveColumnMenu, showPriorityMenu, showStatusMenu, showTaskActionMenu } from './task-menus';
 import type { ViewContext } from './types';
 import type { TaskItem, TaskPriority } from '../types';
 
@@ -173,15 +173,23 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     itemEl.removeClass('is-dragging');
   });
 
-  // Circular complete button
+  // Circular status button: plain click = complete/uncomplete; Ctrl+click = status picker
   const checkBtn = itemEl.createEl('button', {
     cls: `gtd-row-check ${task.isCompleted ? 'is-checked' : ''}`,
-    attr: { 'aria-label': 'Complete task' }
+    attr: { 'aria-label': task.isCompleted ? 'Mark incomplete (Ctrl+click for status menu)' : 'Complete task (Ctrl+click for status menu)' }
   });
-  setIcon(checkBtn, 'check');
+  // Uncompleted → empty circle ring; Completed → filled check circle
+  setIcon(checkBtn, task.isCompleted ? 'check' : 'circle');
+  checkBtn.title = task.isCompleted
+    ? 'Click to uncomplete · Ctrl+click for status menu'
+    : 'Click to complete · Ctrl+click for status menu';
   checkBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    await ctx.taskMutator.setCompletion(task, !task.isCompleted);
+    if (e.ctrlKey || e.metaKey) {
+      showStatusMenu(e, task, ctx);
+    } else {
+      await ctx.taskMutator.setCompletion(task, !task.isCompleted);
+    }
   });
 
   // Body: title + meta chips

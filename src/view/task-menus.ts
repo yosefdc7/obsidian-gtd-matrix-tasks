@@ -26,6 +26,32 @@ export function showPriorityMenu(e: MouseEvent, task: TaskItem, ctx: ViewContext
   menu.showAtMouseEvent(e);
 }
 
+/** Status picker: the 5 standard Obsidian task statuses, Ctrl+click on the circle button. */
+export function showStatusMenu(e: MouseEvent, task: TaskItem, ctx: ViewContext): void {
+  const menu = new Menu();
+  const statuses: { char: string; label: string; icon: string }[] = [
+    { char: ' ', label: '[ ] Todo',        icon: 'circle' },
+    { char: 'x', label: '[x] Done',        icon: 'check-circle' },
+    { char: '/', label: '[/] In Progress', icon: 'loader' },
+    { char: '-', label: '[-] Cancelled',   icon: 'circle-minus' },
+    { char: '?', label: '[?] Waiting',     icon: 'help-circle' }
+  ];
+
+  for (const s of statuses) {
+    menu.addItem((item) => {
+      item
+        .setTitle(s.label)
+        .setIcon(s.icon)
+        .setChecked(task.statusChar === s.char)
+        .onClick(async () => {
+          await ctx.taskMutator.setStatus(task, s.char);
+        });
+    });
+  }
+
+  menu.showAtMouseEvent(e);
+}
+
 /** "Move to column" picker for the active mode, with the current section checked. */
 export function showMoveColumnMenu(e: MouseEvent, task: TaskItem, ctx: ViewContext): void {
   const menu = new Menu();
