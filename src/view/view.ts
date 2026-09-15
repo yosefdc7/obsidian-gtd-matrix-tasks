@@ -48,7 +48,8 @@ export class GTDMatrixView extends ItemView {
       searchQuery: '',
       activeChip: 'all',
       selectedFolder: 'all',
-      collapsedSections: new Set<SectionId>()
+      collapsedSections: new Set<SectionId>(),
+      optionsOpen: false
     };
 
     if (settings) {
@@ -125,7 +126,6 @@ export class GTDMatrixView extends ItemView {
           this.handleTaskDrop(task, targetSection, roleTag),
         handleDateDrop: (task, dayDate) => this.handleDateDrop(task, dayDate),
         openQuickAddModal: (sectionId) => openQuickAddModal(this.ctx, sectionId),
-        quickAddToDate: (text, dayDate) => this.quickAddToDate(text, dayDate),
         getTodayDateString: () => this.scanner.getTodayDateString(),
         rescan: async () => {
           await this.scanner.scanVault();
@@ -154,11 +154,6 @@ export class GTDMatrixView extends ItemView {
   /** By Date day-bucket drop: sets the anchor field's date (scheduling gesture). */
   private async handleDateDrop(task: TaskItem, dayDate: string): Promise<void> {
     await executeDateBucketDrop(task, dayDate, this.viewState.dateAnchor, this.scanner.mutator);
-  }
-
-  /** Quick-add dated to a By Date day bucket, honoring the live anchor field. */
-  private async quickAddToDate(text: string, dayDate: string): Promise<void> {
-    await this.scanner.mutator.quickAddTaskDated(text, dayDate, this.viewState.dateAnchor, null);
   }
 
   private render(): void {

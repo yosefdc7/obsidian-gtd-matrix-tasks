@@ -1,7 +1,7 @@
 import { MarkdownRenderer, setIcon } from 'obsidian';
 import { showMoveColumnMenu, showPriorityMenu, showTaskActionMenu } from './task-menus';
 import type { ViewContext } from './types';
-import type { RoleId, SectionId, TaskItem, TaskPriority } from '../types';
+import type { TaskItem, TaskPriority } from '../types';
 
 function getPriorityLabel(prio: TaskPriority): string {
   switch (prio) {
@@ -149,7 +149,7 @@ export function renderBoardCard(container: HTMLElement, task: TaskItem, ctx: Vie
   });
 }
 
-/** Accordion list row with meta pills, description edit and hover-link support. */
+/** Stream list row: check circle, title, meta chips and a hover action cluster. */
 export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: ViewContext): void {
   const itemEl = container.createDiv({
     cls: `gtd-task-item ${task.isCompleted ? 'is-completed' : ''} ${task.isProject ? 'is-project-task' : ''}`
@@ -173,42 +173,22 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     itemEl.removeClass('is-dragging');
   });
 
-  // Checkbox
-  const checkbox = itemEl.createEl('input', {
-    type: 'checkbox',
-    cls: 'gtd-checkbox'
+  // Circular complete button
+  const checkBtn = itemEl.createEl('button', {
+    cls: `gtd-row-check ${task.isCompleted ? 'is-checked' : ''}`,
+    attr: { 'aria-label': 'Complete task' }
   });
-  checkbox.checked = task.isCompleted;
-  checkbox.addEventListener('change', async (e) => {
+  setIcon(checkBtn, 'check');
+  checkBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    await ctx.taskMutator.setCompletion(task, checkbox.checked);
+    await ctx.taskMutator.setCompletion(task, !task.isCompleted);
   });
 
-  // Priority color pill (icon-only; color and tooltip carry the level)
-  const priorityBtn = itemEl.createEl('button', {
-    cls: `gtd-priority-badge priority-${task.priority}`,
-    attr: { 'aria-label': `Priority: ${getPriorityLabel(task.priority)} — click to change` }
-  });
-  setIcon(priorityBtn, 'arrow-up-down');
-  priorityBtn.title = `Priority: ${getPriorityLabel(task.priority)}`;
-  priorityBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    showPriorityMenu(e, task, ctx);
-  });
-
-  const moveColBtn = itemEl.createEl('button', {
-    cls: 'gtd-move-col-btn',
-    attr: { 'aria-label': 'Move to column' }
-  });
-  setIcon(moveColBtn, 'columns');
-  moveColBtn.title = 'Move task to column';
-  moveColBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    showMoveColumnMenu(e, task, ctx);
-  });
+  // Body: title + meta chips
+  const bodyEl = itemEl.createDiv({ cls: 'gtd-row-body' });
 
   // Description (rendered markdown with smart click routing)
-  const descEl = itemEl.createDiv({ cls: 'gtd-task-desc' });
+  const descEl = bodyEl.createDiv({ cls: 'gtd-task-desc' });
   if (task.description) {
     void MarkdownRenderer.render(ctx.app, task.description, descEl, task.filePath, ctx.component);
   } else {
@@ -258,30 +238,8 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     }
   });
 
-  // Action menu button
-  const actionBtn = itemEl.createEl('button', {
-    cls: 'gtd-card-action-btn',
-    attr: { 'aria-label': 'Task actions' }
-  });
-  setIcon(actionBtn, 'more-horizontal');
-  actionBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    showTaskActionMenu(e, task, ctx);
-  });
-
-  // Edit button on hover
-  const editBtn = itemEl.createEl('button', {
-    cls: 'gtd-edit-btn',
-    attr: { 'aria-label': 'Edit task text' }
-  });
-  setIcon(editBtn, 'pencil');
-  editBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    makeEditable(descEl, task, ctx);
-  });
-
   // Meta row (Scheduled Date + Due Date + Project badge / Note link)
-  const metaEl = itemEl.createDiv({ cls: 'gtd-task-meta' });
+  const metaEl = bodyEl.createDiv({ cls: 'gtd-task-meta' });
   const today = ctx.getTodayDateString();
 
   // 1. Scheduled Date Pill (⏳ Primary)
@@ -297,16 +255,6 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     schedPill.addEventListener('click', (e) => {
       e.stopPropagation();
       showScheduledDatePicker(schedPill, task, ctx);
-    });
-  } else {
-    const addSchedBtn = metaEl.createEl('button', {
-      cls: 'gtd-date-pill gtd-date-add',
-      text: '+ Scheduled'
-    });
-    addSchedBtn.title = 'Add scheduled date (⏳)';
-    addSchedBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      showScheduledDatePicker(addSchedBtn, task, ctx);
     });
   }
 
@@ -339,6 +287,18 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     });
   }
 
+  // Priority chip (icon-only; color and tooltip carry the level)
+  const priorityBtn = metaEl.createEl('button', {
+    cls: `gtd-priority-badge priority-${task.priority}`,
+    attr: { 'aria-label': `Priority: ${getPriorityLabel(task.priority)} — click to change` }
+  });
+  setIcon(priorityBtn, 'arrow-up-down');
+  priorityBtn.title = `Priority: ${getPriorityLabel(task.priority)}`;
+  priorityBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showPriorityMenu(e, task, ctx);
+  });
+
   // Origin note / Project link
   const fileLink = metaEl.createEl('a', {
     cls: `gtd-file-link ${task.isProject ? 'is-project-link' : ''}`,
@@ -361,10 +321,14 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     });
   });
 
-  // Role badge
+  // Role dot chip
   if (task.effectiveRole && task.effectiveRole !== 'untagged') {
     const roleBadge = metaEl.createSpan({
-      cls: `gtd-role-badge badge-${task.effectiveRole.replace('/', '-')}`,
+      cls: `gtd-role-badge badge-${task.effectiveRole.replace('/', '-')}`
+    });
+    roleBadge.createSpan({ cls: 'gtd-role-dot' });
+    roleBadge.createSpan({
+      cls: 'gtd-role-label',
       text:
         task.effectiveRole === 'role/yo-manager'
           ? 'Yo Manager'
@@ -374,6 +338,41 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     });
     roleBadge.title = `Role source: ${task.roleSource}`;
   }
+
+  // Hover action cluster: schedule, move-to-column, more menu
+  const actionsEl = itemEl.createDiv({ cls: 'gtd-row-actions' });
+
+  const scheduleBtn = actionsEl.createEl('button', {
+    cls: 'gtd-row-action-btn',
+    attr: { 'aria-label': 'Schedule' }
+  });
+  setIcon(scheduleBtn, 'calendar');
+  scheduleBtn.title = 'Schedule task';
+  scheduleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showScheduledDatePicker(scheduleBtn, task, ctx);
+  });
+
+  const moveColBtn = actionsEl.createEl('button', {
+    cls: 'gtd-row-action-btn',
+    attr: { 'aria-label': 'Move to column' }
+  });
+  setIcon(moveColBtn, 'columns');
+  moveColBtn.title = 'Move task to column';
+  moveColBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showMoveColumnMenu(e, task, ctx);
+  });
+
+  const actionBtn = actionsEl.createEl('button', {
+    cls: 'gtd-row-action-btn',
+    attr: { 'aria-label': 'Task actions' }
+  });
+  setIcon(actionBtn, 'more-horizontal');
+  actionBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showTaskActionMenu(e, task, ctx);
+  });
 }
 
 function makeEditable(descEl: HTMLElement, task: TaskItem, ctx: ViewContext): void {
@@ -517,46 +516,5 @@ function showStartDatePicker(anchor: HTMLElement, task: TaskItem, ctx: ViewConte
 
   popover.addEventListener('mouseleave', () => {
     popover.remove();
-  });
-}
-
-/** Per-column "+ Add task" input row; roleTag binds quick-added tasks to a swimlane. */
-export function renderQuickAddRow(
-  container: HTMLElement,
-  secId: SectionId,
-  roleTag: string | null | undefined,
-  ctx: ViewContext
-): void {
-  const quickAddEl = container.createDiv({ cls: 'gtd-quick-add-row' });
-  const input = quickAddEl.createEl('input', {
-    type: 'text',
-    cls: 'gtd-quick-add-input',
-    placeholder: '+ Add task (press Enter)...'
-  });
-
-  input.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter' && input.value.trim()) {
-      const text = input.value.trim();
-      input.value = '';
-      await ctx.taskMutator.quickAddTask(secId, text, (roleTag as RoleId) || null);
-    }
-  });
-}
-
-/** Day-bucket quick-add row in the By Date view; the anchor field is stamped with the bucket day. */
-export function renderDateQuickAddRow(container: HTMLElement, dayDate: string, ctx: ViewContext): void {
-  const quickAddEl = container.createDiv({ cls: 'gtd-quick-add-row' });
-  const input = quickAddEl.createEl('input', {
-    type: 'text',
-    cls: 'gtd-quick-add-input',
-    placeholder: '+ Add task (press Enter)...'
-  });
-
-  input.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter' && input.value.trim()) {
-      const text = input.value.trim();
-      input.value = '';
-      await ctx.quickAddToDate(text, dayDate);
-    }
   });
 }

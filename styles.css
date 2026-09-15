@@ -12,33 +12,86 @@
   font-family: var(--font-interface);
 }
 
-/* Toolbar */
+/* Toolbar (Stream chrome: brand row, tabs, options, quick-add, role chips) */
 .gtd-toolbar {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Brand row: icon + title + stats + search */
+.gtd-stream-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
+}
+
+.gtd-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.gtd-brand-icon {
+  display: flex;
+  align-items: center;
+  color: var(--interactive-accent);
+}
+
+.gtd-brand-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.gtd-brand-label {
+  font-weight: 700;
+  font-size: 1.05em;
+  color: var(--text-normal);
 }
 
 .gtd-search-wrapper {
   flex: 1;
   min-width: 200px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background-color: var(--background-secondary);
+  transition: border-color 0.15s;
+}
+
+.gtd-search-wrapper:focus-within {
+  border-color: var(--interactive-accent);
+}
+
+.gtd-search-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+}
+
+.gtd-search-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
 .gtd-search-input {
-  width: 100%;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--background-modifier-border);
-  background-color: var(--background-secondary);
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  border: none;
+  background: transparent;
   color: var(--text-normal);
+  font-size: 0.9em;
 }
 
 .gtd-search-input:focus {
   outline: none;
-  border-color: var(--interactive-accent);
 }
 
 .gtd-folder-select {
@@ -139,6 +192,230 @@
   border-radius: 12px;
 }
 
+/* Options disclosure (layout, sort, filter, chips, folder, refresh) */
+.gtd-options {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.gtd-options-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.gtd-options-toggle:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.gtd-options-toggle.is-active {
+  color: var(--text-accent);
+  border-color: var(--interactive-accent);
+  background-color: rgba(var(--interactive-accent-rgb), 0.1);
+}
+
+.gtd-options-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.gtd-options-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+}
+
+.gtd-matrix-view .is-hidden {
+  display: none !important;
+}
+
+/* Natural-language quick-add bar */
+.gtd-nl-bar {
+  display: flex;
+  flex-direction: column;
+}
+
+.gtd-nl-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 5px 4px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+  transition: border-color 0.15s;
+}
+
+.gtd-nl-bar-row:focus-within {
+  border-color: var(--interactive-accent);
+}
+
+.gtd-nl-bar-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+}
+
+.gtd-nl-bar-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.gtd-nl-bar-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 0.9em;
+}
+
+.gtd-nl-bar-input:focus {
+  outline: none;
+}
+
+.gtd-nl-bar-add {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: none;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-weight: 600;
+  font-size: 0.82em;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.gtd-nl-bar-add:hover {
+  opacity: 0.9;
+}
+
+/* Parse-preview chips (quick-add bar, composers, modal) */
+.gtd-nl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 2px 0;
+}
+
+.gtd-nl-hint {
+  font-size: 0.78em;
+  color: var(--text-faint);
+}
+
+.gtd-nl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 0.76em;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.gtd-nl-chip-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.gtd-nl-chip-icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.gtd-nl-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.gtd-nl-chip-date {
+  color: #8b5cf6;
+  border-color: rgba(139, 92, 246, 0.35);
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.gtd-nl-chip-pri.pri-highest {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.gtd-nl-chip-pri.pri-high {
+  color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.gtd-nl-chip-pri.pri-medium {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.gtd-nl-chip-pri.pri-low {
+  color: #9ca3af;
+  border-color: rgba(156, 163, 175, 0.35);
+  background: rgba(156, 163, 175, 0.1);
+}
+
+.gtd-nl-chip-role.role-yo-manager {
+  color: var(--color-blue, #3b82f6);
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.gtd-nl-chip-role.role-josef-selfcare {
+  color: var(--color-green, #10b981);
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.gtd-nl-chip-role.role-rj-supportive {
+  color: var(--color-purple, #8b5cf6);
+  border-color: rgba(139, 92, 246, 0.35);
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.gtd-nl-chip-role.role-untagged {
+  color: var(--text-muted);
+}
+
+.gtd-nl-chip-dest {
+  color: var(--text-accent);
+  border-color: rgba(var(--interactive-accent-rgb), 0.35);
+  background: rgba(var(--interactive-accent-rgb), 0.08);
+}
+
+.gtd-modal-nl-chips {
+  padding: 0;
+}
+
 /* Sections Wrapper */
 .gtd-sections-wrapper {
   display: flex;
@@ -176,11 +453,12 @@
 .gtd-section.badge-date-someday { border-left: 4px solid #9ca3af; }
 .gtd-section.badge-date-undated { border-left: 4px solid #14b8a6; }
 
-/* Section Header */
+/* Section Header (stream: chevron + uppercase title + count) */
 .gtd-section-header {
   display: flex;
-  flex-direction: column;
-  padding: 10px 14px;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
   cursor: pointer;
   background-color: var(--background-secondary-alt);
   user-select: none;
@@ -199,15 +477,36 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 600;
-  font-size: 1em;
+  min-width: 0;
 }
 
-.gtd-toggle-icon {
+.gtd-section-title {
+  font-weight: 700;
+  font-size: 0.78em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gtd-toggle-icon,
+.gtd-bucket-icon {
   display: inline-flex;
   align-items: center;
-  margin-right: 4px;
   color: var(--text-muted);
+}
+
+.gtd-toggle-icon svg,
+.gtd-bucket-icon svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.15s ease;
+}
+
+.gtd-section.collapsed .gtd-toggle-icon svg {
+  transform: rotate(-90deg);
 }
 
 .gtd-count-badge {
@@ -219,13 +518,6 @@
   color: var(--text-muted);
 }
 
-.gtd-section-subtitle {
-  font-size: 0.8em;
-  color: var(--text-muted);
-  margin-top: 3px;
-  margin-left: 24px;
-}
-
 /* Section Body */
 .gtd-section-body {
   padding: 8px 12px;
@@ -235,29 +527,30 @@
 }
 
 .gtd-empty-state {
-  padding: 14px;
+  padding: 16px 14px;
   text-align: center;
   color: var(--text-faint);
-  font-size: 0.85em;
+  font-size: 0.82em;
   font-style: italic;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 8px;
 }
 
-/* Task Item Card */
+/* Stream task row */
 .gtd-task-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  padding: 7px 10px;
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  padding: 7px 8px;
+  background-color: transparent;
+  border: none;
+  border-radius: 8px;
   cursor: grab;
-  transition: transform 0.1s, box-shadow 0.1s, opacity 0.2s;
+  transition: background-color 0.12s ease, opacity 0.2s;
 }
 
 .gtd-task-item:hover {
-  border-color: var(--interactive-accent);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+  background-color: var(--background-modifier-hover);
 }
 
 .gtd-task-item.is-dragging {
@@ -273,7 +566,108 @@
   color: var(--text-muted);
 }
 
-/* Checkbox */
+/* Circular complete button */
+.gtd-row-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 3px 0 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-faint);
+  background: transparent;
+  color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.gtd-row-check svg {
+  width: 11px;
+  height: 11px;
+}
+
+.gtd-row-check:hover {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+.gtd-row-check.is-checked {
+  background-color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* Row body: title + meta chips */
+.gtd-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Hover action cluster (schedule, move, more) */
+.gtd-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.gtd-task-item:hover .gtd-row-actions,
+.gtd-task-item:focus-within .gtd-row-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .gtd-row-actions {
+    opacity: 1;
+  }
+}
+
+.gtd-row-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.gtd-row-action-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.gtd-row-action-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/*
+ * Fixed-size icon buttons: Obsidian's tablet/phone padding rule
+ * (`.is-tablet button:not(.clickable-icon)`) outranks single-class selectors
+ * and would squeeze the icon to zero width; the scoped selector ties on
+ * specificity and wins by source order.
+ */
+.gtd-matrix-view button.gtd-row-check,
+.gtd-matrix-view button.gtd-row-action-btn,
+.gtd-matrix-view button.gtd-options-toggle,
+.gtd-matrix-view button.gtd-layout-btn,
+.gtd-matrix-view button.gtd-fab-btn {
+  padding: 0;
+}
+
+/* Board card checkbox */
 .gtd-checkbox {
   cursor: pointer;
   width: 16px;
@@ -379,35 +773,6 @@
   background-color: var(--background-primary);
   color: var(--text-normal);
   font-size: 1em;
-}
-
-/* Edit Button on Hover */
-.gtd-edit-btn {
-  opacity: 0;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 2px 4px;
-  color: var(--text-muted);
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.15s, background-color 0.15s, color 0.15s;
-}
-
-.gtd-task-item:hover .gtd-edit-btn {
-  opacity: 1;
-}
-
-.gtd-edit-btn:hover {
-  background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.gtd-edit-btn svg {
-  width: 13px;
-  height: 13px;
 }
 
 /* Metadata Row (Scheduled Date + Due Date + Origin Link) */
@@ -517,9 +882,45 @@
   cursor: pointer;
 }
 
-/* Quick Add Row */
-.gtd-quick-add-row {
-  margin-top: 6px;
+/* Quick-add composer (board columns, list sections, date buckets) */
+.gtd-composer {
+  margin-top: 4px;
+}
+
+.gtd-composer-open {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+
+.gtd-composer-open:hover {
+  color: var(--text-accent);
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.gtd-composer-open-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.gtd-composer-open-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.gtd-composer-editor {
+  display: flex;
+  flex-direction: column;
 }
 
 .gtd-quick-add-input {
@@ -761,6 +1162,9 @@
 }
 
 .gtd-role-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   border-radius: 14px;
   font-size: 0.78em;
@@ -770,6 +1174,26 @@
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.gtd-role-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.gtd-role-chip-btn.chip-role-yo-manager .gtd-role-chip-dot {
+  background: var(--color-blue, #3b82f6);
+}
+
+.gtd-role-chip-btn.chip-role-josef-selfcare .gtd-role-chip-dot {
+  background: var(--color-green, #10b981);
+}
+
+.gtd-role-chip-btn.chip-role-rj-supportive .gtd-role-chip-dot {
+  background: var(--color-purple, #8b5cf6);
 }
 
 .gtd-role-chip-btn:hover {
@@ -807,7 +1231,7 @@
   border-color: var(--text-muted);
 }
 
-/* Role Badges on Tasks */
+/* Role chips on task rows (dot + label) */
 .gtd-role-badge {
   font-size: 0.72em;
   font-weight: 600;
@@ -816,6 +1240,15 @@
   letter-spacing: 0.02em;
   display: inline-flex;
   align-items: center;
+  gap: 4px;
+}
+
+.gtd-role-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 .badge-role-yo-manager {
@@ -1297,9 +1730,48 @@
     order: 10;
   }
 
-  .gtd-search-input {
+  .gtd-matrix-view input.gtd-search-input {
     min-height: 40px;
     font-size: 16px;
+  }
+
+  .gtd-matrix-view input.gtd-nl-bar-input {
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .gtd-matrix-view input.gtd-quick-add-input {
+    font-size: 16px;
+  }
+
+  body input.gtd-modal-input {
+    font-size: 16px;
+  }
+
+  .gtd-options-toggle {
+    width: 40px;
+    height: 40px;
+  }
+
+  .gtd-row-check {
+    width: 32px;
+    height: 32px;
+    margin-top: -4px;
+  }
+
+  .gtd-row-check svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .gtd-row-action-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .gtd-row-action-btn svg {
+    width: 16px;
+    height: 16px;
   }
 
   .gtd-sort-select {

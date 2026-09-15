@@ -1,9 +1,10 @@
 import { setIcon } from 'obsidian';
 import { getEisenhowerSection, getGTDSection, sortTasks } from '../parser';
-import { renderDateQuickAddRow, renderQuickAddRow, renderTaskItem } from './card-renderer';
+import { renderTaskItem } from './card-renderer';
+import { renderDateQuickAddRow, renderQuickAddRow } from './composer';
 import { DATE_BUCKET_COMPLETED } from './date-buckets';
 import type { DateBucketDefinition } from './date-buckets';
-import { ROLE_SWIMLANES } from './types';
+import { getSectionShortTitle, ROLE_SWIMLANES } from './types';
 import type { ViewContext } from './types';
 import type { RoleId, SectionDefinition, SectionId, TaskItem } from '../types';
 
@@ -20,22 +21,21 @@ export function renderSection(
     cls: `gtd-section ${sec.badgeClass} ${isCollapsed ? 'collapsed' : ''}`
   });
 
-  // Header
+  // Header: chevron + uppercase short title + count; full text in tooltip
   const headerEl = sectionEl.createDiv({ cls: 'gtd-section-header' });
+  headerEl.title = `${sec.title}\n${sec.subtitle}`;
 
   const toggleIcon = headerEl.createSpan({ cls: 'gtd-toggle-icon' });
-  setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+  setIcon(toggleIcon, 'chevron-down');
 
   const titleGroup = headerEl.createDiv({ cls: 'gtd-title-group' });
-  titleGroup.createSpan({ cls: 'gtd-section-title', text: sec.title });
+  titleGroup.createSpan({
+    cls: 'gtd-section-title',
+    text: getSectionShortTitle(sec.id, sec.title)
+  });
   titleGroup.createSpan({
     cls: 'gtd-count-badge',
     text: String(tasks.length)
-  });
-
-  headerEl.createDiv({
-    cls: 'gtd-section-subtitle',
-    text: sec.subtitle
   });
 
   headerEl.addEventListener('click', (e) => {
@@ -93,7 +93,7 @@ export function renderSection(
       }
     }
 
-    renderQuickAddRow(bodyEl, sec.id, roleTag, ctx);
+    renderQuickAddRow(bodyEl, sec.id, roleTag, ctx, true);
   }
 }
 
@@ -195,14 +195,16 @@ function renderDateSection(
 
   // Header (static bucket icon; no collapse in By Date)
   const headerEl = sectionEl.createDiv({ cls: 'gtd-section-header' });
-  const iconSpan = headerEl.createSpan({ cls: 'gtd-toggle-icon' });
+  headerEl.title = `${bucket.title}\n${bucket.subtitle}`;
+  const iconSpan = headerEl.createSpan({ cls: 'gtd-bucket-icon' });
   setIcon(iconSpan, bucket.icon);
 
   const titleGroup = headerEl.createDiv({ cls: 'gtd-title-group' });
-  titleGroup.createSpan({ cls: 'gtd-section-title', text: bucket.title });
+  titleGroup.createSpan({
+    cls: 'gtd-section-title',
+    text: bucket.title.split('—')[0].trim()
+  });
   titleGroup.createSpan({ cls: 'gtd-count-badge', text: String(tasks.length) });
-
-  headerEl.createDiv({ cls: 'gtd-section-subtitle', text: bucket.subtitle });
 
   // Drop handling: day buckets accept drops (scheduling gesture); others reject
   if (bucket.dayDate) {

@@ -130,5 +130,17 @@ export function showTaskActionMenu(e: MouseEvent, task: TaskItem, ctx: ViewConte
       });
   });
 
+  menu.addSeparator();
+
+  // 6. Delete task (removes the raw line from its source file)
+  menu.addItem((item) => {
+    item
+      .setTitle('Delete task')
+      .setIcon('trash')
+      .onClick(async () => {
+        await ctx.taskMutator.deleteTaskLine(task);
+      });
+  });
+
   menu.showAtMouseEvent(e);
 }

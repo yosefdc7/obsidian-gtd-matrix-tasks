@@ -143,6 +143,25 @@ export const ROLE_SWIMLANES: SwimlaneDefinition[] = [
   }
 ];
 
+/** Compact section title used by composer chips and stream/list headers. */
+export function getSectionShortTitle(secId: SectionId, defaultTitle: string): string {
+  const titles: Record<string, string> = {
+    'gtd-inbox': 'Inbox',
+    'gtd-next-actions': 'Next Actions',
+    'gtd-waiting': 'Waiting',
+    'gtd-scheduled': 'Scheduled',
+    'gtd-someday': 'Someday',
+    'gtd-completed': 'Done',
+    'eisen-q1': 'Q1 Urgent',
+    'eisen-q2': 'Q2 Important',
+    'eisen-q3': 'Q3 Delegate',
+    'eisen-q4': 'Q4 Low',
+    'eisen-inbox': 'Inbox',
+    'eisen-completed': 'Done'
+  };
+  return titles[secId] || defaultTitle.split('—')[0].trim();
+}
+
 /** Mutable view state owned by the coordinator. */
 export interface ViewState {
   viewMode: ViewMode;
@@ -157,6 +176,8 @@ export interface ViewState {
   activeChip: QuickFilterChip;
   selectedFolder: string;
   collapsedSections: Set<SectionId>;
+  /** Options disclosure (sort/folder/chips); session-only, default false. */
+  optionsOpen: boolean;
 }
 
 /**
@@ -177,8 +198,6 @@ export interface ViewContext {
   /** By Date day-bucket drop: sets the anchor field's date (scheduling gesture). */
   handleDateDrop(task: TaskItem, dayDate: string): Promise<void>;
   openQuickAddModal(sectionId?: SectionId): void;
-  /** Quick-add dated to a specific day, honoring the live anchor field. */
-  quickAddToDate(text: string, dayDate: string): Promise<void>;
   getTodayDateString(): string;
   rescan(): Promise<void>;
   saveSettings(): Promise<void>;

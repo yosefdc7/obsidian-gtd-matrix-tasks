@@ -1,5 +1,6 @@
 import { App, TFile } from 'obsidian';
 import { DateAnchorField, TaskItem, TaskPriority, SectionId, PluginSettings, RoleId } from '../types';
+import type { ParsedInput } from '../nl-input';
 import {
   setTaskPriority,
   setTaskCompletion,
@@ -140,42 +141,107 @@ export class TaskMutator {
     );
   }
 
-  public async quickAddTask(sectionId: SectionId, text: string, role?: RoleId | null): Promise<boolean> {
+  /**
+   * Deletes the task's line, mirroring updateTaskLine's locate strategy
+   * (exact index → trimmed match → 25-char fuzzy). Indented children stay in
+   * place — there is no cascade. Returns false only when the file is missing.
+   */
+  public async deleteTaskLine(task: TaskItem): Promise<boolean> {
+    const abstractFile = this.app.vault.getAbstractFileByPath(task.filePath);
+    if (!(abstractFile instanceof TFile)) {
+      console.warn(`Target file ${task.filePath} not found`);
+      return false;
+    }
+
+    try {
+      await this.app.vault.process(abstractFile, (data) => {
+        const lines = data.split('\n');
+        let targetIndex = task.lineNumber;
+
+        // Verify or fuzzy-find if lines shifted
+        if (targetIndex >= lines.length || lines[targetIndex] !== task.rawText) {
+          const matchIdx = lines.findIndex((l) => l.trim() === task.rawText.trim());
+          if (matchIdx !== -1) {
+            targetIndex = matchIdx;
+          } else {
+            // Fuzzy search by description
+            const searchPart = task.rawText.replace(/[-*+]\s*\[.\]/, '').trim().slice(0, 25);
+            const partialIdx = lines.findIndex((l) => l.includes(searchPart));
+            if (partialIdx !== -1) {
+              targetIndex = partialIdx;
+            } else {
+              console.warn('Could not locate task line for deletion');
+              return data;
+            }
+          }
+        }
+
+        lines.splice(targetIndex, 1);
+        return lines.join('\n');
+      });
+
+      if (this.scanEngine) {
+        await this.scanEngine.reindexFile(abstractFile);
+      }
+      return true;
+    } catch (err) {
+      console.error(`Failed to delete task in ${task.filePath}:`, err);
+      return false;
+    }
+  }
+
+  public async quickAddTask(
+    sectionId: SectionId,
+    text: string,
+    role?: RoleId | null,
+    parsed?: ParsedInput | null
+  ): Promise<boolean> {
     let isWaiting = false;
-    let priority: TaskPriority = 'none';
+    let quadrantPriority: TaskPriority | null = null;
+    let sectionPriority: TaskPriority = 'none';
+    let sectionDate: string | null = null;
     let extra = '';
 
     switch (sectionId) {
       case 'gtd-next-actions':
-        priority = 'high';
+        sectionPriority = 'high';
         break;
       case 'gtd-waiting':
         isWaiting = true;
         break;
       case 'gtd-scheduled':
-        extra = ` ⏳ ${this.getTodayDateString()}`;
+        sectionDate = this.getTodayDateString();
         break;
       case 'gtd-someday':
         extra = ' #someday';
         break;
       case 'eisen-q1':
-        priority = 'highest';
+        quadrantPriority = 'highest';
         break;
       case 'eisen-q2':
-        priority = 'high';
+        quadrantPriority = 'high';
         break;
       case 'eisen-q3':
-        priority = 'medium';
+        quadrantPriority = 'medium';
         break;
       case 'eisen-q4':
-        priority = 'low';
+        quadrantPriority = 'low';
         break;
       default:
         break;
     }
 
-    if (role && role !== 'untagged') {
-      extra += ` #${role}`;
+    // Parsed overlay precedence: role parsed > lane role; priority quadrant >
+    // parsed > section default; scheduled date parsed > section default.
+    const effectiveRole = parsed?.role ?? role;
+    const priority = quadrantPriority ?? parsed?.priority ?? sectionPriority;
+    const scheduledDate = parsed?.scheduledDate ?? sectionDate;
+
+    if (effectiveRole && effectiveRole !== 'untagged') {
+      extra += ` #${effectiveRole}`;
+    }
+    if (scheduledDate) {
+      extra += ` ⏳ ${scheduledDate}`;
     }
 
     const statusBox = isWaiting ? '- [?]' : '- [ ]';
@@ -195,15 +261,24 @@ export class TaskMutator {
     text: string,
     dateStr: string,
     anchorField: DateAnchorField,
-    role?: RoleId | null
+    role?: RoleId | null,
+    parsed?: ParsedInput | null
   ): Promise<boolean> {
     const token = anchorField === 'start' ? '🛫' : anchorField === 'due' ? '📅' : '⏳';
-    let extra = ` ${token} ${dateStr}`;
-    if (role && role !== 'untagged') {
-      extra += ` #${role}`;
+    // Parsed overlay: a parsed date overrides the bucket day (anchor token
+    // kept), parsed role overrides, and parsed priority is stamped.
+    const effectiveDate = parsed?.scheduledDate ?? dateStr;
+    const effectiveRole = parsed?.role ?? role;
+
+    let extra = ` ${token} ${effectiveDate}`;
+    if (effectiveRole && effectiveRole !== 'untagged') {
+      extra += ` #${effectiveRole}`;
     }
 
     let rawTask = `- [ ] ${text.trim()}${extra}`;
+    if (parsed?.priority) {
+      rawTask = setTaskPriority(rawTask, parsed.priority);
+    }
     if (this.settings.autoAddCreatedDate) {
       rawTask += ` ➕ ${this.getTodayDateString()}`;
     }

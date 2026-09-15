@@ -1,28 +1,11 @@
 import { setIcon } from 'obsidian';
 import { getEisenhowerSection, getGTDSection, sortTasks } from '../parser';
-import { renderBoardCard, renderDateQuickAddRow, renderQuickAddRow } from './card-renderer';
+import { renderBoardCard } from './card-renderer';
+import { renderDateQuickAddRow, renderQuickAddRow } from './composer';
 import type { DateBucketDefinition } from './date-buckets';
-import { ROLE_SWIMLANES } from './types';
+import { getSectionShortTitle, ROLE_SWIMLANES } from './types';
 import type { ViewContext } from './types';
 import type { RoleId, SectionDefinition, SectionId, TaskItem } from '../types';
-
-function getSectionShortTitle(secId: SectionId, defaultTitle: string): string {
-  const titles: Record<string, string> = {
-    'gtd-inbox': 'Inbox',
-    'gtd-next-actions': 'Next Actions',
-    'gtd-waiting': 'Waiting',
-    'gtd-scheduled': 'Scheduled',
-    'gtd-someday': 'Someday',
-    'gtd-completed': 'Done',
-    'eisen-q1': 'Q1 Urgent',
-    'eisen-q2': 'Q2 Important',
-    'eisen-q3': 'Q3 Delegate',
-    'eisen-q4': 'Q4 Low',
-    'eisen-inbox': 'Inbox',
-    'eisen-completed': 'Done'
-  };
-  return titles[secId] || defaultTitle.split('—')[0].trim();
-}
 
 /** Kanban board with mobile column tabs, drop zones and per-column quick add. */
 export function renderBoard(

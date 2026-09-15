@@ -3,6 +3,7 @@ import { App, TFile } from 'obsidian';
 import { TaskMutator } from '../src/store/task-mutator';
 import type { ScanEngine } from '../src/store/scan-engine';
 import { DEFAULT_SETTINGS, PluginSettings, TaskItem } from '../src/types';
+import type { ParsedInput } from '../src/nl-input';
 
 const TODAY = '2026-09-15';
 const DAILY_PATH = 'Jots/2026/Sep/Sep 15 2026.md';
@@ -64,6 +65,16 @@ function createTask(overrides: Partial<TaskItem> = {}): TaskItem {
     linkedNotes: [],
     effectiveRole: 'untagged',
     roleSource: 'none',
+    ...overrides
+  };
+}
+
+function parsedInput(overrides: Partial<ParsedInput> = {}): ParsedInput {
+  return {
+    description: 'Ship it',
+    scheduledDate: null,
+    priority: null,
+    role: null,
     ...overrides
   };
 }
@@ -299,6 +310,72 @@ describe('TaskMutator.quickAddTask', () => {
     expect(vault.folders.has('Jots/2026/Sep')).toBe(true);
     expect(reindexSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('applies the parsed overlay: role tag and priority beat section defaults', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app);
+
+    await mutator.quickAddTask(
+      'gtd-next-actions',
+      'Pay bill',
+      undefined,
+      parsedInput({ priority: 'highest', role: 'role/rj-supportive' })
+    );
+
+    expect(vault.files.get(DAILY_PATH)).toBe(
+      '# 2026-09-15\n- [ ] Pay bill #role/rj-supportive ⏫\n'
+    );
+  });
+
+  it('lets the parsed role override a lane role', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app);
+
+    await mutator.quickAddTask(
+      'gtd-inbox',
+      'Lane task',
+      'role/yo-manager',
+      parsedInput({ role: 'role/josef-selfcare' })
+    );
+
+    expect(vault.files.get(DAILY_PATH)).toBe('# 2026-09-15\n- [ ] Lane task #role/josef-selfcare\n');
+  });
+
+  it('clears the lane role when the parsed role is untagged', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app);
+
+    await mutator.quickAddTask('gtd-inbox', 'Untagged task', 'role/yo-manager', parsedInput({ role: 'untagged' }));
+
+    expect(vault.files.get(DAILY_PATH)).toBe('# 2026-09-15\n- [ ] Untagged task\n');
+  });
+
+  it('stamps a parsed scheduled date over the section default', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app);
+
+    await mutator.quickAddTask('gtd-scheduled', 'Book flight', undefined, parsedInput({ scheduledDate: '2026-09-16' }));
+
+    expect(vault.files.get(DAILY_PATH)).toBe('# 2026-09-15\n- [ ] Book flight ⏳ 2026-09-16\n');
+  });
+
+  it('stamps a parsed date on sections without a date default', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app);
+
+    await mutator.quickAddTask('gtd-inbox', 'Call mom', undefined, parsedInput({ scheduledDate: '2026-09-16' }));
+
+    expect(vault.files.get(DAILY_PATH)).toBe('# 2026-09-15\n- [ ] Call mom ⏳ 2026-09-16\n');
+  });
+
+  it('keeps the Eisenhower quadrant priority over the parsed priority', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app);
+
+    await mutator.quickAddTask('eisen-q1', 'Fix outage', undefined, parsedInput({ priority: 'high' }));
+
+    expect(vault.files.get(DAILY_PATH)).toBe('# 2026-09-15\n- [ ] Fix outage ⏫\n');
+  });
 });
 
 describe('TaskMutator.quickAddTaskDated', () => {
@@ -350,6 +427,105 @@ describe('TaskMutator.quickAddTaskDated', () => {
     expect(ok).toBe(true);
     expect(vault.files.get(DAILY_PATH)).toBe(`# ${TODAY}\n\n## Tasks\n\n- [ ] Plan sprint ⏳ 2026-09-18\n`);
     expect(vault.folders.has('Jots/2026/Sep')).toBe(true);
+  });
+
+  it('parsed date overrides the bucket day and keeps the anchor token', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app);
+
+    await mutator.quickAddTaskDated('Prep deck', '2026-09-18', 'due', undefined, parsedInput({ scheduledDate: '2026-09-20' }));
+
+    expect(vault.files.get(DAILY_PATH)).toBe('# 2026-09-15\n- [ ] Prep deck 📅 2026-09-20\n');
+  });
+
+  it('stamps parsed priority and overrides the role', async () => {
+    const { app, vault } = createMockApp({ [DAILY_PATH]: '# 2026-09-15\n' });
+    const mutator = createMutator(app);
+
+    await mutator.quickAddTaskDated(
+      'Review PR',
+      '2026-09-18',
+      'scheduled',
+      'role/yo-manager',
+      parsedInput({ priority: 'medium', role: 'role/rj-supportive' })
+    );
+
+    expect(vault.files.get(DAILY_PATH)).toBe(
+      '# 2026-09-15\n- [ ] Review PR ⏳ 2026-09-18 #role/rj-supportive 🔽\n'
+    );
+  });
+});
+
+describe('TaskMutator.deleteTaskLine', () => {
+  it('removes the exact line and reindexes', async () => {
+    const { app, vault } = createMockApp({ 'Tasks.md': '- [ ] First\n- [ ] Second\n- [ ] Third\n' });
+    const mutator = createMutator(app);
+    const task = createTask({ lineNumber: 1, rawText: '- [ ] Second' });
+
+    const ok = await mutator.deleteTaskLine(task);
+
+    expect(ok).toBe(true);
+    expect(vault.files.get('Tasks.md')).toBe('- [ ] First\n- [ ] Third\n');
+    expect(reindexSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('fuzzy-finds the line when it has shifted', async () => {
+    const { app, vault } = createMockApp({
+      'Tasks.md': '- [ ] Inserted\n- [ ] First\n- [ ] Second\n'
+    });
+    const mutator = createMutator(app);
+    const task = createTask({ lineNumber: 1, rawText: '- [ ] Second' });
+
+    await mutator.deleteTaskLine(task);
+
+    expect(vault.files.get('Tasks.md')).toBe('- [ ] Inserted\n- [ ] First\n');
+  });
+
+  it('falls back to a partial description match when the line changed', async () => {
+    const changedLine = '- [x] Implement the new dashboard feature ✅ 2026-09-14';
+    const { app, vault } = createMockApp({ 'Tasks.md': `- [ ] Other\n${changedLine}\n` });
+    const mutator = createMutator(app);
+    const task = createTask({
+      lineNumber: 0,
+      rawText: '- [ ] Implement the new dashboard feature'
+    });
+
+    await mutator.deleteTaskLine(task);
+
+    expect(vault.files.get('Tasks.md')).toBe('- [ ] Other\n');
+  });
+
+  it('leaves the data unchanged when the line cannot be located', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { app, vault } = createMockApp({ 'Tasks.md': '- [ ] Something else entirely\n' });
+    const mutator = createMutator(app);
+    const task = createTask({ lineNumber: 9, rawText: '- [ ] Vanished task' });
+
+    const ok = await mutator.deleteTaskLine(task);
+
+    expect(ok).toBe(true);
+    expect(vault.files.get('Tasks.md')).toBe('- [ ] Something else entirely\n');
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it('leaves indented children in place (no cascade)', async () => {
+    const { app, vault } = createMockApp({ 'Tasks.md': '- [ ] Parent\n  - [ ] Child\n' });
+    const mutator = createMutator(app);
+    const task = createTask({ lineNumber: 0, rawText: '- [ ] Parent' });
+
+    await mutator.deleteTaskLine(task);
+
+    expect(vault.files.get('Tasks.md')).toBe('  - [ ] Child\n');
+  });
+
+  it('returns false when the file does not exist', async () => {
+    const { app } = createMockApp();
+    const mutator = createMutator(app);
+
+    const ok = await mutator.deleteTaskLine(createTask({ filePath: 'Missing.md' }));
+
+    expect(ok).toBe(false);
+    expect(reindexSpy).not.toHaveBeenCalled();
   });
 });
 

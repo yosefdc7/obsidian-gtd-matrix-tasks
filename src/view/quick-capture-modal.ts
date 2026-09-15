@@ -1,4 +1,7 @@
 import { setIcon } from 'obsidian';
+import { parseNaturalLanguageInput } from '../nl-input';
+import { renderParseChips } from './composer';
+import { getSectionShortTitle } from './types';
 import type { ViewContext } from './types';
 import type { RoleId, SectionId } from '../types';
 
@@ -36,6 +39,7 @@ export function openQuickAddModal(ctx: ViewContext, sectionId?: SectionId): void
     cls: 'gtd-modal-input',
     placeholder: 'What needs to be done?'
   });
+  const chipsEl = sheet.createDiv({ cls: 'gtd-nl-chips gtd-modal-nl-chips' });
 
   // Destination Section Selector
   const secRow = sheet.createDiv({ cls: 'gtd-modal-options-row' });
@@ -62,6 +66,7 @@ export function openQuickAddModal(ctx: ViewContext, sectionId?: SectionId): void
       selectedSecId = sec.id;
       secButtons.forEach((b) => b.removeClass('is-active'));
       chip.addClass('is-active');
+      updateChips();
     });
   }
 
@@ -92,6 +97,20 @@ export function openQuickAddModal(ctx: ViewContext, sectionId?: SectionId): void
     });
   }
 
+  // Natural-language parse chips under the input (hint while empty)
+  function updateChips(): void {
+    const value = input.value.trim();
+    const todayStr = ctx.getTodayDateString();
+    renderParseChips(
+      chipsEl,
+      value ? parseNaturalLanguageInput(value, todayStr) : null,
+      getSectionShortTitle(selectedSecId, selectedSecId),
+      todayStr
+    );
+  }
+  updateChips();
+  input.addEventListener('input', updateChips);
+
   // Submit Button
   const submitBtn = sheet.createEl('button', {
     cls: 'gtd-modal-submit-btn',
@@ -101,8 +120,14 @@ export function openQuickAddModal(ctx: ViewContext, sectionId?: SectionId): void
   const handleSave = async () => {
     const text = input.value.trim();
     if (!text) return;
+    const parsed = parseNaturalLanguageInput(text, ctx.getTodayDateString());
     backdrop.remove();
-    await ctx.taskMutator.quickAddTask(selectedSecId, text, selectedRole);
+    await ctx.taskMutator.quickAddTask(
+      selectedSecId,
+      parsed.description,
+      parsed.role ?? selectedRole,
+      parsed
+    );
   };
 
   submitBtn.addEventListener('click', handleSave);
