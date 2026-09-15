@@ -1,248 +1,63 @@
-import { App, TFile, debounce } from 'obsidian';
+import { App, TFile } from 'obsidian';
 import { TaskItem, TaskPriority, SectionId, PluginSettings, RoleId } from './types';
-import {
-  parseTaskLine,
-  setTaskPriority,
-  setTaskCompletion,
-  setTaskDueDate,
-  setTaskScheduledDate,
-  setTaskDescription,
-  setTaskWaiting,
-  setTaskSomeday,
-  setTaskRole,
-  extractRoleFromTags,
-  extractRoleFromPath
-} from './parser';
+import { TaskStore } from './store/task-store';
+import { RoleResolver, ResolvedRole } from './store/role-resolver';
+import { ScanEngine } from './store/scan-engine';
+import { TaskMutator } from './store/task-mutator';
 
 export class VaultScanner {
-  private app: App;
-  private settings: PluginSettings;
-  private tasks: TaskItem[] = [];
-  private listeners: ((tasks: TaskItem[]) => void)[] = [];
+  public store: TaskStore;
+  public roleResolver: RoleResolver;
+  public scanEngine: ScanEngine;
+  public mutator: TaskMutator;
   public debouncedScan: () => void;
   public debouncedNotify: () => void;
 
   constructor(app: App, settings: PluginSettings) {
-    this.app = app;
-    this.settings = settings;
-    this.debouncedScan = debounce(() => this.scanVault(), 2000, false);
-    this.debouncedNotify = debounce(() => this.notify(), 150, false);
+    this.store = new TaskStore();
+    this.roleResolver = new RoleResolver(app);
+    this.scanEngine = new ScanEngine(app, settings, this.store, this.roleResolver);
+    this.mutator = new TaskMutator(app, settings, this.scanEngine);
+
+    this.debouncedScan = this.scanEngine.debouncedScan;
+    this.debouncedNotify = this.store.debouncedNotify;
   }
 
   public onTasksUpdated(callback: (tasks: TaskItem[]) => void): () => void {
-    this.listeners.push(callback);
-    return () => {
-      this.listeners = this.listeners.filter((l) => l !== callback);
-    };
-  }
-
-  private notify() {
-    for (const listener of this.listeners) {
-      try {
-        listener(this.tasks);
-      } catch (err) {
-        console.error('Error in GTD Matrix Tasks listener', err);
-      }
-    }
+    return this.store.onTasksUpdated(callback);
   }
 
   public getTasks(): TaskItem[] {
-    return this.tasks;
+    return this.store.getTasks();
   }
 
   public updateSettings(settings: PluginSettings): void {
-    this.settings = settings;
+    this.scanEngine.updateSettings(settings);
+    this.mutator.updateSettings(settings);
   }
 
   public isExcluded(filePath: string): boolean {
-    const normalized = filePath.replace(/\\/g, '/');
-    for (const excluded of this.settings.excludedFolders) {
-      const normEx = excluded.replace(/\\/g, '/');
-      if (normalized.startsWith(normEx) || normalized.includes(`/${normEx}/`)) {
-        return true;
-      }
-    }
-    return false;
+    return this.scanEngine.isExcluded(filePath);
   }
 
-  public resolveTaskRole(task: TaskItem): { role: RoleId; source: 'inline' | 'linked-note' | 'parent-note' | 'none' } {
-    // 1. Inline tag on task
-    const inlineRole = extractRoleFromTags(task.tags);
-    if (inlineRole) {
-      return { role: inlineRole, source: 'inline' };
-    }
-
-    // 2. Linked note role
-    if (task.linkedNotes && task.linkedNotes.length > 0) {
-      for (const link of task.linkedNotes) {
-        const targetFile = this.app.metadataCache.getFirstLinkpathDest(link, task.filePath);
-        if (targetFile) {
-          const pathRole = extractRoleFromPath(targetFile.path);
-          if (pathRole) {
-            return { role: pathRole, source: 'linked-note' };
-          }
-          const cache = this.app.metadataCache.getFileCache(targetFile);
-          const frontTags = cache?.frontmatter?.tags;
-          const tagsList: string[] = Array.isArray(frontTags)
-            ? frontTags.map(String)
-            : typeof frontTags === 'string'
-            ? frontTags.split(',').map((s) => s.trim())
-            : [];
-          const tagRole = extractRoleFromTags(tagsList);
-          if (tagRole) {
-            return { role: tagRole, source: 'linked-note' };
-          }
-        }
-      }
-    }
-
-    // 3. Parent note role (path or frontmatter)
-    const parentPathRole = extractRoleFromPath(task.filePath);
-    if (parentPathRole) {
-      return { role: parentPathRole, source: 'parent-note' };
-    }
-    const parentAbstract = this.app.vault.getAbstractFileByPath(task.filePath);
-    if (parentAbstract instanceof TFile) {
-      const parentCache = this.app.metadataCache.getFileCache(parentAbstract);
-      const frontTags = parentCache?.frontmatter?.tags;
-      const tagsList: string[] = Array.isArray(frontTags)
-        ? frontTags.map(String)
-        : typeof frontTags === 'string'
-        ? frontTags.split(',').map((s) => s.trim())
-        : [];
-      const parentTagRole = extractRoleFromTags(tagsList);
-      if (parentTagRole) {
-        return { role: parentTagRole, source: 'parent-note' };
-      }
-    }
-
-    // 4. Fallback
-    return { role: 'untagged', source: 'none' };
+  public resolveTaskRole(task: TaskItem): ResolvedRole {
+    return this.roleResolver.resolveTaskRole(task);
   }
 
   public async scanVault(): Promise<TaskItem[]> {
-    const files = this.app.vault.getMarkdownFiles().filter((f) => !this.isExcluded(f.path));
-
-    const allTasks: TaskItem[] = [];
-    const CHUNK_SIZE = 50;
-
-    for (let i = 0; i < files.length; i += CHUNK_SIZE) {
-      const chunk = files.slice(i, i + CHUNK_SIZE);
-      await Promise.all(
-        chunk.map(async (file) => {
-          try {
-            const content = await this.app.vault.cachedRead(file);
-            const lines = content.split('\n');
-            const cache = this.app.metadataCache.getFileCache(file);
-
-            if (cache?.listItems) {
-              for (const item of cache.listItems) {
-                if (item.task !== undefined) {
-                  const lineIdx = item.position.start.line;
-                  if (lineIdx < lines.length) {
-                    const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-                    if (task) {
-                      const res = this.resolveTaskRole(task);
-                      task.effectiveRole = res.role;
-                      task.roleSource = res.source;
-                      allTasks.push(task);
-                    }
-                  }
-                }
-              }
-            } else {
-              for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-                const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-                if (task) {
-                  const res = this.resolveTaskRole(task);
-                  task.effectiveRole = res.role;
-                  task.roleSource = res.source;
-                  allTasks.push(task);
-                }
-              }
-            }
-          } catch (err) {
-            console.error(`Error reading ${file.path} in GTD Matrix Tasks:`, err);
-          }
-        })
-      );
-    }
-
-    this.tasks = allTasks;
-    this.notify();
-    return this.tasks;
+    return this.scanEngine.scanVault();
   }
 
   public async reindexFile(file: TFile): Promise<void> {
-    if (!file || file.extension !== 'md') return;
-
-    if (this.isExcluded(file.path)) {
-      const prevCount = this.tasks.length;
-      this.tasks = this.tasks.filter((t) => t.filePath !== file.path);
-      if (this.tasks.length !== prevCount) {
-        this.debouncedNotify();
-      }
-      return;
-    }
-
-    const cache = this.app.metadataCache.getFileCache(file);
-    const fileTasks: TaskItem[] = [];
-
-    // Only read file if it contains list items / tasks or cache is not ready
-    if (!cache || (cache.listItems && cache.listItems.some((i) => i.task !== undefined))) {
-      try {
-        const content = await this.app.vault.cachedRead(file);
-        const lines = content.split('\n');
-
-        if (cache?.listItems) {
-          for (const item of cache.listItems) {
-            if (item.task !== undefined) {
-              const lineIdx = item.position.start.line;
-              if (lineIdx < lines.length) {
-                const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-                if (task) {
-                  const res = this.resolveTaskRole(task);
-                  task.effectiveRole = res.role;
-                  task.roleSource = res.source;
-                  fileTasks.push(task);
-                }
-              }
-            }
-          }
-        } else {
-          for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-            const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-            if (task) {
-              const res = this.resolveTaskRole(task);
-              task.effectiveRole = res.role;
-              task.roleSource = res.source;
-              fileTasks.push(task);
-            }
-          }
-        }
-      } catch (err) {
-        console.error(`Error reindexing ${file.path} in GTD Matrix Tasks:`, err);
-        return;
-      }
-    }
-
-    // Atomically replace tasks for this file
-    const otherTasks = this.tasks.filter((t) => t.filePath !== file.path);
-    this.tasks = otherTasks.concat(fileTasks);
-    this.debouncedNotify();
+    return this.scanEngine.reindexFile(file);
   }
 
   public handleFileDelete(filePath: string): void {
-    const prevCount = this.tasks.length;
-    this.tasks = this.tasks.filter((t) => t.filePath !== filePath);
-    if (this.tasks.length !== prevCount) {
-      this.debouncedNotify();
-    }
+    this.scanEngine.handleFileDelete(filePath);
   }
 
   public async handleFileRename(newFile: TFile, oldPath: string): Promise<void> {
-    this.handleFileDelete(oldPath);
-    await this.reindexFile(newFile);
+    return this.scanEngine.handleFileRename(newFile, oldPath);
   }
 
   public async updateTaskLine(
@@ -251,203 +66,57 @@ export class VaultScanner {
     originalText: string,
     mutator: (line: string) => string
   ): Promise<boolean> {
-    const abstractFile = this.app.vault.getAbstractFileByPath(filePath);
-    if (!(abstractFile instanceof TFile)) {
-      console.warn(`Target file ${filePath} not found`);
-      return false;
-    }
+    return this.mutator.updateTaskLine(filePath, lineNumber, originalText, mutator);
+  }
 
-    try {
-      await this.app.vault.process(abstractFile, (data) => {
-        const lines = data.split('\n');
-        let targetIndex = lineNumber;
-
-        // Verify or fuzzy-find if lines shifted
-        if (targetIndex >= lines.length || lines[targetIndex] !== originalText) {
-          const matchIdx = lines.findIndex((l) => l.trim() === originalText.trim());
-          if (matchIdx !== -1) {
-            targetIndex = matchIdx;
-          } else {
-            // Fuzzy search by description
-            const searchPart = originalText.replace(/[-*+]\s*\[.\]/, '').trim().slice(0, 25);
-            const partialIdx = lines.findIndex((l) => l.includes(searchPart));
-            if (partialIdx !== -1) {
-              targetIndex = partialIdx;
-            } else {
-              console.warn('Could not locate original task line for update');
-              return data;
-            }
-          }
-        }
-
-        lines[targetIndex] = mutator(lines[targetIndex]);
-        return lines.join('\n');
-      });
-
-      // Incremental re-index of the modified file
-      await this.reindexFile(abstractFile);
-      return true;
-    } catch (err) {
-      console.error(`Failed to update task in ${filePath}:`, err);
-      return false;
-    }
+  public async batchUpdateTaskLine(
+    task: TaskItem,
+    mutator: (line: string) => string
+  ): Promise<boolean> {
+    return this.mutator.batchUpdateTaskLine(task, mutator);
   }
 
   public async setPriority(task: TaskItem, newPriority: TaskPriority): Promise<boolean> {
-    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
-      setTaskPriority(line, newPriority)
-    );
+    return this.mutator.setPriority(task, newPriority);
   }
 
   public async setCompletion(task: TaskItem, completed: boolean): Promise<boolean> {
-    const today = this.getTodayDateString();
-    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
-      setTaskCompletion(line, completed, today)
-    );
+    return this.mutator.setCompletion(task, completed);
   }
 
   public async setDueDate(task: TaskItem, dueDate: string | null): Promise<boolean> {
-    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
-      setTaskDueDate(line, dueDate)
-    );
+    return this.mutator.setDueDate(task, dueDate);
   }
 
   public async setScheduledDate(task: TaskItem, scheduledDate: string | null): Promise<boolean> {
-    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
-      setTaskScheduledDate(line, scheduledDate)
-    );
+    return this.mutator.setScheduledDate(task, scheduledDate);
   }
 
   public async setDescription(task: TaskItem, newDescription: string): Promise<boolean> {
-    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
-      setTaskDescription(line, newDescription)
-    );
+    return this.mutator.setDescription(task, newDescription);
   }
 
   public async setWaiting(task: TaskItem, waiting: boolean): Promise<boolean> {
-    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
-      setTaskWaiting(line, waiting)
-    );
+    return this.mutator.setWaiting(task, waiting);
   }
 
   public async setSomeday(task: TaskItem, someday: boolean): Promise<boolean> {
-    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
-      setTaskSomeday(line, someday)
-    );
+    return this.mutator.setSomeday(task, someday);
   }
 
   public async setRole(task: TaskItem, newRole: RoleId | null): Promise<boolean> {
-    return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
-      setTaskRole(line, newRole)
-    );
+    return this.mutator.setRole(task, newRole);
   }
 
   public async quickAddTask(sectionId: SectionId, text: string, role?: RoleId | null): Promise<boolean> {
-    const dailyPath = this.getDailyNotePath();
-    let file = this.app.vault.getAbstractFileByPath(dailyPath);
-
-    let isWaiting = false;
-    let priority: TaskPriority = 'none';
-    let extra = '';
-
-    switch (sectionId) {
-      case 'gtd-next-actions':
-        priority = 'high';
-        break;
-      case 'gtd-waiting':
-        isWaiting = true;
-        break;
-      case 'gtd-scheduled':
-        extra = ` ⏳ ${this.getTodayDateString()}`;
-        break;
-      case 'gtd-someday':
-        extra = ' #someday';
-        break;
-      case 'eisen-q1':
-        priority = 'highest';
-        break;
-      case 'eisen-q2':
-        priority = 'high';
-        break;
-      case 'eisen-q3':
-        priority = 'medium';
-        break;
-      case 'eisen-q4':
-        priority = 'low';
-        break;
-      default:
-        break;
-    }
-
-    if (role && role !== 'untagged') {
-      extra += ` #${role}`;
-    }
-
-    const statusBox = isWaiting ? '- [?]' : '- [ ]';
-    let rawTask = `${statusBox} ${text.trim()}${extra}`;
-    if (priority !== 'none') {
-      rawTask = setTaskPriority(rawTask, priority);
-    }
-    if (this.settings.autoAddCreatedDate) {
-      rawTask += ` ➕ ${this.getTodayDateString()}`;
-    }
-
-    if (!(file instanceof TFile)) {
-      // Create folder if needed
-      const parts = dailyPath.split('/');
-      parts.pop();
-      const folderPath = parts.join('/');
-      await this.ensureFolderExists(folderPath);
-
-      // Create file
-      const initialContent = `# ${this.getTodayDateString()}\n\n## Tasks\n\n${rawTask}\n`;
-      file = await this.app.vault.create(dailyPath, initialContent);
-    } else {
-      await this.app.vault.process(file, (data) => {
-        return `${data.trimEnd()}\n${rawTask}\n`;
-      });
-    }
-
-    await this.reindexFile(file as TFile);
-    return true;
-  }
-
-  private async ensureFolderExists(path: string): Promise<void> {
-    if (!path || path === '.') return;
-    const existing = this.app.vault.getAbstractFileByPath(path);
-    if (!existing) {
-      const parts = path.split('/');
-      let current = '';
-      for (const part of parts) {
-        current = current ? `${current}/${part}` : part;
-        const check = this.app.vault.getAbstractFileByPath(current);
-        if (!check) {
-          try {
-            await this.app.vault.createFolder(current);
-          } catch (e) {
-            // Already created or concurrent
-          }
-        }
-      }
-    }
+    return this.mutator.quickAddTask(sectionId, text, role);
   }
 
   public getTodayDateString(): string {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return this.mutator.getTodayDateString();
   }
 
   public getDailyNotePath(): string {
-    const d = new Date();
-    const year = d.getFullYear();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const monthStr = months[d.getMonth()];
-    const day = String(d.getDate()).padStart(2, '0');
-
-    // Convention in vault: Jots/YYYY/MMM/MMM DD YYYY.md
-    return `${this.settings.defaultDailyNoteFolder}/${year}/${monthStr}/${monthStr} ${day} ${year}.md`;
+    return this.mutator.getDailyNotePath();
   }
 }
