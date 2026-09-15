@@ -85,6 +85,9 @@ export interface PluginSettings {
   autoMoveNotes: boolean;
   autoInheritParentLinks: boolean;
   autoInheritActiveWindowHours: number;
+  enableLatestBacklinkHover: boolean;
+  backlinkHoverDelayMs: number;
+  backlinkHoverMaxChars: number;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -109,5 +112,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   autoMoveNotes: true,
   autoInheritParentLinks: true,
   autoInheritActiveWindowHours: 24,
+  enableLatestBacklinkHover: true,
+  backlinkHoverDelayMs: 250,
+  backlinkHoverMaxChars: 200,
 };
 

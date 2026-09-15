@@ -154,6 +154,34 @@ export class GTDMatrixSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName('Enable latest backlink hover tooltip')
+      .setDesc('Hovering over any internal link displays the latest backlink mention. Hold Alt (or Shift) to use standard Obsidian Page Preview.')
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.enableLatestBacklinkHover !== false)
+          .onChange(async (value) => {
+            this.plugin.settings.enableLatestBacklinkHover = value;
+            this.plugin.hoverManager?.updateSettings(this.plugin.settings);
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName('Backlink hover delay (ms)')
+      .setDesc('Delay before displaying the backlink tooltip on hover (prevents accidental triggers during fast mouse movement). Default: 250ms.')
+      .addSlider((slider) => {
+        slider
+          .setLimits(100, 800, 25)
+          .setValue(this.plugin.settings.backlinkHoverDelayMs ?? 250)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.backlinkHoverDelayMs = value;
+            this.plugin.hoverManager?.updateSettings(this.plugin.settings);
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
       .setName('Excluded folders')
       .setDesc('Folders to exclude from task indexing (one folder path per line).')
       .addTextArea((text) => {

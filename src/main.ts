@@ -6,11 +6,13 @@ import { PluginSettings, DEFAULT_SETTINGS } from './types';
 import { isDateTitledNote } from './date-utils';
 import { AutoMover } from './auto-mover';
 import { reconcileNoteContent, isWithinActiveWindow } from './context-linker';
+import { HoverManager } from './hover-manager';
 
 export default class GTDMatrixPlugin extends Plugin {
   public settings: PluginSettings = DEFAULT_SETTINGS;
   public scanner: VaultScanner = null!;
   public autoMover: AutoMover = null!;
+  public hoverManager: HoverManager = null!;
   public lastActiveFile: TFile | null = null;
 
   async onload(): Promise<void> {
@@ -18,6 +20,7 @@ export default class GTDMatrixPlugin extends Plugin {
 
     this.scanner = new VaultScanner(this.app, this.settings);
     this.autoMover = new AutoMover(this.app, this.settings);
+    this.hoverManager = new HoverManager(this.app, this.settings);
 
     this.registerView(
       VIEW_TYPE_GTD_MATRIX,
@@ -275,6 +278,7 @@ export default class GTDMatrixPlugin extends Plugin {
   }
 
   onunload(): void {
+    this.hoverManager?.destroy();
     this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
       if (leaf.view instanceof MarkdownView) {
         leaf.view.containerEl.removeClass('is-date-note');
