@@ -660,6 +660,17 @@ export class GTDMatrixView extends ItemView {
       this.showPriorityMenu(e, task);
     });
 
+    const moveColBtn = topRow.createEl('button', {
+      cls: 'gtd-move-col-btn',
+      attr: { 'aria-label': 'Move to column' }
+    });
+    setIcon(moveColBtn, 'columns');
+    moveColBtn.title = 'Move task to column';
+    moveColBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showMoveColumnMenu(e, task);
+    });
+
     const actionBtn = topRow.createEl('button', {
       cls: 'gtd-card-action-btn',
       attr: { 'aria-label': 'Task actions' }
@@ -1052,6 +1063,17 @@ export class GTDMatrixView extends ItemView {
     priorityBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.showPriorityMenu(e, task);
+    });
+
+    const moveColBtn = itemEl.createEl('button', {
+      cls: 'gtd-move-col-btn',
+      attr: { 'aria-label': 'Move to column' }
+    });
+    setIcon(moveColBtn, 'columns');
+    moveColBtn.title = 'Move task to column';
+    moveColBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showMoveColumnMenu(e, task);
     });
 
     // Description (rendered markdown with smart click routing)
@@ -1463,6 +1485,32 @@ export class GTDMatrixView extends ItemView {
       'eisen-completed': 'Done'
     };
     return titles[secId] || defaultTitle.split('—')[0].trim();
+  }
+
+  private showMoveColumnMenu(e: MouseEvent, task: TaskItem): void {
+    const menu = new Menu();
+    const todayStr = this.scanner.getTodayDateString();
+    const activeSections = this.viewMode === 'gtd' ? GTD_SECTIONS : EISENHOWER_SECTIONS;
+    const currentSectionId =
+      this.viewMode === 'gtd'
+        ? getGTDSection(task, todayStr)
+        : getEisenhowerSection(task, todayStr);
+
+    for (const sec of activeSections) {
+      menu.addItem((item) => {
+        item
+          .setTitle(sec.title)
+          .setIcon(sec.icon)
+          .setChecked(sec.id === currentSectionId)
+          .onClick(async () => {
+            if (sec.id !== currentSectionId) {
+              await this.handleTaskDrop(task, sec.id);
+            }
+          });
+      });
+    }
+
+    menu.showAtMouseEvent(e);
   }
 
   private showTaskActionMenu(e: MouseEvent, task: TaskItem): void {
