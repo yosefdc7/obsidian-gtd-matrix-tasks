@@ -938,3 +938,410 @@
   gap: 10px;
 }
 
+/* ==========================================================================
+   Mobile-First UX & UI Styles
+   ========================================================================== */
+
+/* Card action button (three-dots menu) */
+.gtd-card-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-left: auto;
+  transition: background 0.15s, color 0.15s;
+}
+
+.gtd-card-action-btn:hover,
+.gtd-card-action-btn:active {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.gtd-card-action-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Mobile Column Tabs */
+.gtd-mobile-col-tabs {
+  display: none;
+  overflow-x: auto;
+  white-space: nowrap;
+  gap: 6px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  position: sticky;
+  top: 0;
+  background: var(--background-primary);
+  z-index: 20;
+}
+
+.gtd-mobile-col-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.gtd-mobile-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 18px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 0.82em;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 36px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.gtd-mobile-tab-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+  box-shadow: 0 2px 8px rgba(var(--interactive-accent-rgb), 0.25);
+}
+
+.gtd-mobile-tab-btn .gtd-count-badge {
+  font-size: 0.82em;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.15);
+  color: inherit;
+}
+
+/* Floating Action Button (FAB) */
+.gtd-fab-btn {
+  position: fixed;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  right: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 26px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gtd-fab-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.gtd-fab-btn:active {
+  transform: scale(0.92);
+}
+
+.gtd-fab-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Mobile Quick Add Modal / Bottom Sheet */
+.gtd-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  z-index: 1100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: gtdFadeIn 0.15s ease-out;
+}
+
+.gtd-modal-sheet {
+  background: var(--background-primary);
+  width: 100%;
+  max-width: 540px;
+  border-radius: 16px 16px 0 0;
+  border: 1px solid var(--background-modifier-border);
+  border-bottom: none;
+  padding: 16px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3);
+  animation: gtdSlideUp 0.2s ease-out;
+}
+
+@keyframes gtdFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes gtdSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.gtd-modal-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gtd-modal-title {
+  font-weight: 700;
+  font-size: 1.1em;
+  color: var(--text-normal);
+}
+
+.gtd-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gtd-modal-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: 16px;
+}
+
+.gtd-modal-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.gtd-modal-options-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gtd-modal-options-label {
+  font-size: 0.78em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.gtd-modal-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.gtd-modal-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.gtd-modal-chip {
+  padding: 5px 12px;
+  border-radius: 14px;
+  font-size: 0.82em;
+  font-weight: 500;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.gtd-modal-chip.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.gtd-modal-submit-btn {
+  margin-top: 6px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  font-weight: 600;
+  font-size: 1em;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.gtd-modal-submit-btn:hover {
+  opacity: 0.9;
+}
+
+/* ==========================================================================
+   Responsive Mobile Breakpoint (< 768px or Mobile Shell)
+   ========================================================================== */
+@media (max-width: 768px), (pointer: coarse) {
+  .gtd-matrix-view {
+    padding: 10px 8px 80px;
+    gap: 10px;
+  }
+
+  .gtd-toolbar {
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+
+  .gtd-role-chips-wrapper,
+  .gtd-chips-wrapper {
+    overflow-x: auto;
+    white-space: nowrap;
+    width: 100%;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+  }
+
+  .gtd-role-chips-wrapper::-webkit-scrollbar,
+  .gtd-chips-wrapper::-webkit-scrollbar {
+    display: none;
+  }
+
+  .gtd-role-chip-btn,
+  .gtd-chip-btn {
+    flex-shrink: 0;
+    min-height: 36px;
+    padding: 6px 14px;
+    font-size: 0.84em;
+  }
+
+  .gtd-mode-btn {
+    min-height: 36px;
+    padding: 6px 12px;
+  }
+
+  .gtd-layout-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .gtd-search-wrapper {
+    min-width: 100%;
+    order: 10;
+  }
+
+  .gtd-search-input {
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .gtd-sort-select {
+    min-height: 36px;
+    font-size: 0.85em;
+  }
+
+  /* Mobile Tabs & Carousel */
+  .gtd-mobile-col-tabs {
+    display: flex;
+  }
+
+  .gtd-board {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 4px 80px;
+  }
+
+  .gtd-board-column {
+    flex: 0 0 calc(100vw - 32px);
+    min-width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+    scroll-snap-align: center;
+    border-radius: 12px;
+  }
+
+  .gtd-swimlane-board {
+    min-height: auto;
+  }
+
+  .gtd-swimlane-row {
+    padding: 10px 8px;
+  }
+
+  /* Card ergonomics & touch targets */
+  .gtd-board-card {
+    padding: 12px 12px 10px;
+    gap: 8px;
+    border-radius: 10px;
+  }
+
+  .gtd-board-card-desc {
+    font-size: 0.95em;
+    line-height: 1.45;
+  }
+
+  .gtd-task-item {
+    padding: 10px 12px;
+    gap: 12px;
+    border-radius: 8px;
+  }
+
+  .gtd-checkbox {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .gtd-priority-badge {
+    min-height: 28px;
+    padding: 2px 10px;
+    font-size: 0.82em;
+  }
+
+  .gtd-date-pill {
+    min-height: 28px;
+    padding: 4px 9px;
+    font-size: 0.82em;
+  }
+
+  .gtd-file-link {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 0.82em;
+  }
+}
+
+/* Hide FAB on wide desktop screens */
+@media (min-width: 769px) {
+  body:not(.is-phone):not(.is-mobile) .gtd-fab-btn {
+    display: none;
+  }
+}
+
+

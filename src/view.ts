@@ -269,36 +269,38 @@ export class GTDMatrixView extends ItemView {
       } else {
         this.renderSwimlaneList(container, activeSections, filteredTasks, todayStr);
       }
-      return;
-    }
-
-    // Group tasks according to active View Mode (Filter Mode)
-    const grouped = new Map<SectionId, TaskItem[]>();
-    for (const sec of activeSections) {
-      grouped.set(sec.id, []);
-    }
-
-    for (const task of filteredTasks) {
-      const secId =
-        this.viewMode === 'gtd'
-          ? getGTDSection(task, todayStr)
-          : getEisenhowerSection(task, todayStr);
-
-      if (secId) {
-        grouped.get(secId)?.push(task);
-      }
-    }
-
-    // Render Board or List
-    if (this.layoutMode === 'board') {
-      this.renderBoard(container, activeSections, grouped);
     } else {
-      const sectionsWrapper = container.createDiv({ cls: 'gtd-sections-wrapper' });
+      // Group tasks according to active View Mode (Filter Mode)
+      const grouped = new Map<SectionId, TaskItem[]>();
       for (const sec of activeSections) {
-        const sectionTasks = grouped.get(sec.id) || [];
-        this.renderSection(sectionsWrapper, sec, sectionTasks);
+        grouped.set(sec.id, []);
+      }
+
+      for (const task of filteredTasks) {
+        const secId =
+          this.viewMode === 'gtd'
+            ? getGTDSection(task, todayStr)
+            : getEisenhowerSection(task, todayStr);
+
+        if (secId) {
+          grouped.get(secId)?.push(task);
+        }
+      }
+
+      // Render Board or List
+      if (this.layoutMode === 'board') {
+        this.renderBoard(container, activeSections, grouped);
+      } else {
+        const sectionsWrapper = container.createDiv({ cls: 'gtd-sections-wrapper' });
+        for (const sec of activeSections) {
+          const sectionTasks = grouped.get(sec.id) || [];
+          this.renderSection(sectionsWrapper, sec, sectionTasks);
+        }
       }
     }
+
+    // Floating action button for mobile quick capture
+    this.renderFloatingActionButton(container);
   }
 
   private renderToolbar(container: HTMLElement, allTasks: TaskItem[]): void {
@@ -508,11 +510,77 @@ export class GTDMatrixView extends ItemView {
     sections: SectionDefinition[],
     grouped: Map<SectionId, TaskItem[]>
   ): void {
+    // Render mobile column tabs carousel
+    const tabsWrapper = container.createDiv({ cls: 'gtd-mobile-col-tabs' });
+    const tabButtons = new Map<SectionId, HTMLButtonElement>();
+
+    for (const sec of sections) {
+      const colTasks = grouped.get(sec.id) || [];
+      const tabBtn = tabsWrapper.createEl('button', {
+        cls: 'gtd-mobile-tab-btn',
+        attr: { 'data-target-section': sec.id }
+      });
+      const iconSpan = tabBtn.createSpan({ cls: 'gtd-mobile-tab-icon' });
+      setIcon(iconSpan, sec.icon);
+
+      const shortTitle = this.getSectionShortTitle(sec.id, sec.title);
+      tabBtn.createSpan({ cls: 'gtd-mobile-tab-label', text: shortTitle });
+      tabBtn.createSpan({ cls: 'gtd-count-badge', text: String(colTasks.length) });
+
+      tabBtn.addEventListener('click', () => {
+        const targetCol = board.querySelector(`[data-section-id="${sec.id}"]`);
+        if (targetCol) {
+          targetCol.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+        tabButtons.forEach((btn) => btn.removeClass('is-active'));
+        tabBtn.addClass('is-active');
+      });
+
+      tabButtons.set(sec.id, tabBtn);
+    }
+
+    if (sections.length > 0) {
+      tabButtons.get(sections[0].id)?.addClass('is-active');
+    }
+
     const board = container.createDiv({ cls: 'gtd-board' });
+
+    // Sync horizontal scroll with mobile tabs
+    let scrollTimer: number | null = null;
+    board.addEventListener('scroll', () => {
+      if (scrollTimer) window.clearTimeout(scrollTimer);
+      scrollTimer = window.setTimeout(() => {
+        const boardRect = board.getBoundingClientRect();
+        const boardCenter = boardRect.left + boardRect.width / 2;
+        let closestSecId: SectionId | null = null;
+        let minDistance = Infinity;
+
+        const cols = board.querySelectorAll<HTMLElement>('.gtd-board-column');
+        cols.forEach((col) => {
+          const rect = col.getBoundingClientRect();
+          const colCenter = rect.left + rect.width / 2;
+          const dist = Math.abs(colCenter - boardCenter);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestSecId = col.getAttribute('data-section-id') as SectionId;
+          }
+        });
+
+        if (closestSecId && tabButtons.has(closestSecId)) {
+          tabButtons.forEach((btn) => btn.removeClass('is-active'));
+          const activeBtn = tabButtons.get(closestSecId);
+          if (activeBtn) {
+            activeBtn.addClass('is-active');
+            activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          }
+        }
+      }, 75);
+    });
 
     for (const sec of sections) {
       const colTasks = grouped.get(sec.id) || [];
       const col = board.createDiv({ cls: `gtd-board-column ${sec.badgeClass}` });
+      col.setAttribute('data-section-id', sec.id);
 
       // Column header
       const colHeader = col.createDiv({ cls: 'gtd-board-col-header' });
@@ -573,7 +641,7 @@ export class GTDMatrixView extends ItemView {
     });
     card.addEventListener('dragend', () => card.removeClass('is-dragging'));
 
-    // Top row: checkbox + priority badge
+    // Top row: checkbox + priority badge + action menu button
     const topRow = card.createDiv({ cls: 'gtd-board-card-top' });
     const checkbox = topRow.createEl('input', { type: 'checkbox', cls: 'gtd-checkbox' });
     checkbox.checked = task.isCompleted;
@@ -590,6 +658,16 @@ export class GTDMatrixView extends ItemView {
     priorityBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.showPriorityMenu(e, task);
+    });
+
+    const actionBtn = topRow.createEl('button', {
+      cls: 'gtd-card-action-btn',
+      attr: { 'aria-label': 'Task actions' }
+    });
+    setIcon(actionBtn, 'more-horizontal');
+    actionBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showTaskActionMenu(e, task);
     });
 
     // Description
@@ -814,6 +892,7 @@ export class GTDMatrixView extends ItemView {
       for (const sec of sections) {
         const colTasks = laneGrouped.get(sec.id) || [];
         const col = grid.createDiv({ cls: `gtd-board-column ${sec.badgeClass}` });
+        col.setAttribute('data-section-id', sec.id);
 
         // Column header
         const colHeader = col.createDiv({ cls: 'gtd-board-col-header' });
@@ -1024,6 +1103,17 @@ export class GTDMatrixView extends ItemView {
           });
         }
       }
+    });
+
+    // Action menu button
+    const actionBtn = itemEl.createEl('button', {
+      cls: 'gtd-card-action-btn',
+      attr: { 'aria-label': 'Task actions' }
+    });
+    setIcon(actionBtn, 'more-horizontal');
+    actionBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showTaskActionMenu(e, task);
     });
 
     // Edit button on hover
@@ -1355,5 +1445,250 @@ export class GTDMatrixView extends ItemView {
       default:
         return '+ Priority';
     }
+  }
+
+  private getSectionShortTitle(secId: SectionId, defaultTitle: string): string {
+    const titles: Record<string, string> = {
+      'gtd-inbox': 'Inbox',
+      'gtd-next-actions': 'Next Actions',
+      'gtd-waiting': 'Waiting',
+      'gtd-scheduled': 'Scheduled',
+      'gtd-someday': 'Someday',
+      'gtd-completed': 'Done',
+      'eisen-q1': 'Q1 Urgent',
+      'eisen-q2': 'Q2 Important',
+      'eisen-q3': 'Q3 Delegate',
+      'eisen-q4': 'Q4 Low',
+      'eisen-inbox': 'Inbox',
+      'eisen-completed': 'Done'
+    };
+    return titles[secId] || defaultTitle.split('—')[0].trim();
+  }
+
+  private showTaskActionMenu(e: MouseEvent, task: TaskItem): void {
+    const menu = new Menu();
+
+    // 1. Completion Toggle
+    menu.addItem((item) => {
+      item
+        .setTitle(task.isCompleted ? 'Mark Incomplete' : 'Mark Complete')
+        .setIcon(task.isCompleted ? 'circle' : 'check-circle')
+        .onClick(async () => {
+          await this.scanner.setCompletion(task, !task.isCompleted);
+        });
+    });
+
+    menu.addSeparator();
+
+    // 2. GTD State Transitions
+    menu.addItem((item) => {
+      item
+        .setTitle('Move to Next Actions')
+        .setIcon('zap')
+        .onClick(async () => {
+          await this.handleTaskDrop(task, 'gtd-next-actions');
+        });
+    });
+
+    menu.addItem((item) => {
+      item
+        .setTitle('Schedule (Set Today+10)')
+        .setIcon('calendar')
+        .onClick(async () => {
+          await this.handleTaskDrop(task, 'gtd-scheduled');
+        });
+    });
+
+    menu.addItem((item) => {
+      item
+        .setTitle('Mark as Waiting (#waiting)')
+        .setIcon('clock')
+        .onClick(async () => {
+          await this.handleTaskDrop(task, 'gtd-waiting');
+        });
+    });
+
+    menu.addItem((item) => {
+      item
+        .setTitle('Move to Someday / Maybe (#someday)')
+        .setIcon('archive')
+        .onClick(async () => {
+          await this.handleTaskDrop(task, 'gtd-someday');
+        });
+    });
+
+    menu.addItem((item) => {
+      item
+        .setTitle('Move to Inbox')
+        .setIcon('inbox')
+        .onClick(async () => {
+          await this.handleTaskDrop(task, 'gtd-inbox');
+        });
+    });
+
+    menu.addSeparator();
+
+    // 3. Priority Menu Trigger
+    menu.addItem((item) => {
+      item
+        .setTitle('Change Priority...')
+        .setIcon('flag')
+        .onClick(() => {
+          this.showPriorityMenu(e, task);
+        });
+    });
+
+    // 4. Role Assignment Subitems
+    const roles: { id: RoleId | null; label: string; icon: string }[] = [
+      { id: 'role/yo-manager', label: 'Role: Yo Manager', icon: 'briefcase' },
+      { id: 'role/josef-selfcare', label: 'Role: Josef Self-Care', icon: 'heart' },
+      { id: 'role/rj-supportive', label: 'Role: RJ Supportive', icon: 'users' },
+      { id: null, label: 'Role: Untagged / None', icon: 'tag' }
+    ];
+    for (const r of roles) {
+      menu.addItem((item) => {
+        item
+          .setTitle(r.label)
+          .setIcon(r.icon)
+          .setChecked(task.effectiveRole === (r.id || 'untagged'))
+          .onClick(async () => {
+            await this.scanner.setRole(task, r.id);
+          });
+      });
+    }
+
+    menu.addSeparator();
+
+    // 5. Open Source Note
+    menu.addItem((item) => {
+      item
+        .setTitle(`Open Note (${task.fileName})`)
+        .setIcon('file-text')
+        .onClick(() => {
+          void this.app.workspace.openLinkText(task.filePath, '', 'tab');
+        });
+    });
+
+    menu.showAtMouseEvent(e);
+  }
+
+  private renderFloatingActionButton(container: HTMLElement): void {
+    const fab = container.createEl('button', {
+      cls: 'gtd-fab-btn',
+      attr: { 'aria-label': 'Quick capture task' }
+    });
+    setIcon(fab, 'plus');
+    fab.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openQuickAddModal();
+    });
+  }
+
+  private openQuickAddModal(): void {
+    const backdrop = document.body.createDiv({ cls: 'gtd-modal-backdrop' });
+    const sheet = backdrop.createDiv({ cls: 'gtd-modal-sheet' });
+
+    // Header
+    const header = sheet.createDiv({ cls: 'gtd-modal-title-row' });
+    header.createSpan({ cls: 'gtd-modal-title', text: 'Quick Capture Task' });
+    const closeBtn = header.createEl('button', {
+      cls: 'gtd-modal-close-btn',
+      attr: { 'aria-label': 'Close modal' }
+    });
+    setIcon(closeBtn, 'x');
+    closeBtn.addEventListener('click', () => backdrop.remove());
+
+    // Task Description Input
+    const input = sheet.createEl('input', {
+      type: 'text',
+      cls: 'gtd-modal-input',
+      placeholder: 'What needs to be done?'
+    });
+
+    // Destination Section Selector
+    const secRow = sheet.createDiv({ cls: 'gtd-modal-options-row' });
+    secRow.createSpan({ cls: 'gtd-modal-options-label', text: 'Destination' });
+    const secChips = secRow.createDiv({ cls: 'gtd-modal-chips' });
+    const sections: { id: SectionId; label: string }[] = [
+      { id: 'gtd-next-actions', label: '⚡ Next Actions' },
+      { id: 'gtd-inbox', label: '📥 Inbox' },
+      { id: 'gtd-scheduled', label: '⏳ Scheduled' },
+      { id: 'gtd-waiting', label: '🕒 Waiting' },
+      { id: 'gtd-someday', label: '📦 Someday' }
+    ];
+    let selectedSecId: SectionId = 'gtd-next-actions';
+    const secButtons: HTMLElement[] = [];
+
+    for (const sec of sections) {
+      const chip = secChips.createEl('button', {
+        cls: `gtd-modal-chip ${sec.id === selectedSecId ? 'is-active' : ''}`,
+        text: sec.label
+      });
+      secButtons.push(chip);
+      chip.addEventListener('click', (e) => {
+        e.preventDefault();
+        selectedSecId = sec.id;
+        secButtons.forEach((b) => b.removeClass('is-active'));
+        chip.addClass('is-active');
+      });
+    }
+
+    // Role Selector
+    const roleRow = sheet.createDiv({ cls: 'gtd-modal-options-row' });
+    roleRow.createSpan({ cls: 'gtd-modal-options-label', text: 'Role' });
+    const roleChips = roleRow.createDiv({ cls: 'gtd-modal-chips' });
+    const roles: { id: RoleId | null; label: string }[] = [
+      { id: 'role/yo-manager', label: '💼 Yo Manager' },
+      { id: 'role/josef-selfcare', label: '❤️ Josef Self-Care' },
+      { id: 'role/rj-supportive', label: '👥 RJ Supportive' },
+      { id: null, label: '🏷️ None' }
+    ];
+    let selectedRole: RoleId | null = null;
+    const roleButtons: HTMLElement[] = [];
+
+    for (const role of roles) {
+      const chip = roleChips.createEl('button', {
+        cls: `gtd-modal-chip ${role.id === selectedRole ? 'is-active' : ''}`,
+        text: role.label
+      });
+      roleButtons.push(chip);
+      chip.addEventListener('click', (e) => {
+        e.preventDefault();
+        selectedRole = role.id;
+        roleButtons.forEach((b) => b.removeClass('is-active'));
+        chip.addClass('is-active');
+      });
+    }
+
+    // Submit Button
+    const submitBtn = sheet.createEl('button', {
+      cls: 'gtd-modal-submit-btn',
+      text: 'Capture to Daily Jot'
+    });
+
+    const handleSave = async () => {
+      const text = input.value.trim();
+      if (!text) return;
+      backdrop.remove();
+      await this.scanner.quickAddTask(selectedSecId, text, selectedRole);
+    };
+
+    submitBtn.addEventListener('click', handleSave);
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        void handleSave();
+      } else if (e.key === 'Escape') {
+        backdrop.remove();
+      }
+    });
+
+    // Dismiss on backdrop click
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) backdrop.remove();
+    });
+
+    setTimeout(() => input.focus(), 60);
   }
 }
