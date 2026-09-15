@@ -175,8 +175,8 @@ export default class GTDMatrixPlugin extends Plugin {
     try {
       const content = await this.app.vault.read(file);
       if (content.trim() === '') {
-        // Empty new note: initialize frontmatter with tags
-        await this.app.vault.modify(file, '---\ntags: []\n---\n\n');
+        // Empty new note: initialize frontmatter with tags and Note Tasks Query
+        await this.app.vault.modify(file, '---\ntags: []\n---\n\n---\n![[Note Tasks Query]]\n---\n');
       } else if (!onlyIfEmpty) {
         // Created with content: ensure tags exist in frontmatter, and migrate legacy role if present
         await this.app.fileManager.processFrontMatter(file, (fm) => {
