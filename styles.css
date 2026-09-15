@@ -882,38 +882,140 @@
   text-decoration: none;
 }
 
-/* Date Popover */
-.gtd-date-popover {
+/* Date Popover (Minimalist Month Calendar) */
+.gtd-calendar-popover {
   position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 100;
+  z-index: var(--layer-popover, 1000);
+  width: 240px;
   background-color: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  padding: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
+  user-select: none;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.gtd-cal-header {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 4px;
 }
 
-.gtd-date-input {
-  padding: 3px 6px;
-  border-radius: 4px;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary);
+.gtd-cal-title {
+  font-weight: 600;
+  font-size: 13px;
   color: var(--text-normal);
-  font-size: 0.85em;
 }
 
-.gtd-btn-sm {
-  padding: 3px 8px;
-  font-size: 0.75em;
+.gtd-cal-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.gtd-cal-nav-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.gtd-cal-nav-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.gtd-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding-bottom: 2px;
+}
+
+.gtd-cal-weekday {
+  padding: 2px 0;
+}
+
+.gtd-cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.gtd-cal-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background-color 0.1s, color 0.1s;
+}
+
+.gtd-cal-day:hover {
+  background: var(--background-modifier-hover);
+}
+
+.gtd-cal-day.is-other-month {
+  color: var(--text-faint);
+  opacity: 0.5;
+}
+
+.gtd-cal-day.is-today {
+  font-weight: 700;
+  color: var(--interactive-accent);
+  border: 1px solid var(--interactive-accent);
+}
+
+.gtd-cal-day.is-selected {
+  background: var(--interactive-accent) !important;
+  color: var(--text-on-accent) !important;
+  font-weight: 700;
+}
+
+.gtd-cal-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.gtd-cal-clear-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
   border-radius: 4px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
+  color: var(--text-muted);
   cursor: pointer;
+  transition: background-color 0.1s, color 0.1s;
+}
+
+.gtd-cal-clear-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 
 /* Quick-add composer (board columns, list sections, date buckets) */

@@ -1,4 +1,5 @@
 import { MarkdownRenderer, setIcon } from 'obsidian';
+import { showCalendarPicker } from './calendar-picker';
 import { showMoveColumnMenu, showPriorityMenu, showStatusMenu, showTaskActionMenu } from './task-menus';
 import type { ViewContext } from './types';
 import type { TaskItem, TaskPriority } from '../types';
@@ -432,97 +433,31 @@ function makeEditable(descEl: HTMLElement, task: TaskItem, ctx: ViewContext): vo
 }
 
 function showScheduledDatePicker(anchor: HTMLElement, task: TaskItem, ctx: ViewContext): void {
-  const popover = createDiv({ cls: 'gtd-date-popover' });
-  const dateInput = popover.createEl('input', {
-    type: 'date',
-    cls: 'gtd-date-input',
-    value: task.scheduledDate || ctx.getTodayDateString()
-  });
-
-  const clearBtn = popover.createEl('button', {
-    cls: 'gtd-btn-sm',
-    text: 'Clear'
-  });
-
-  anchor.parentElement?.appendChild(popover);
-  dateInput.focus();
-
-  dateInput.addEventListener('change', async () => {
-    await ctx.taskMutator.setScheduledDate(task, dateInput.value || null);
-    popover.remove();
-  });
-
-  clearBtn.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    await ctx.taskMutator.setScheduledDate(task, null);
-    popover.remove();
-  });
-
-  popover.addEventListener('mouseleave', () => {
-    popover.remove();
+  showCalendarPicker(anchor, {
+    currentDate: task.scheduledDate,
+    todayDate: ctx.getTodayDateString(),
+    onSelect: async (date) => {
+      await ctx.taskMutator.setScheduledDate(task, date);
+    }
   });
 }
 
 function showDueDatePicker(anchor: HTMLElement, task: TaskItem, ctx: ViewContext): void {
-  const popover = createDiv({ cls: 'gtd-date-popover' });
-  const dateInput = popover.createEl('input', {
-    type: 'date',
-    cls: 'gtd-date-input',
-    value: task.dueDate || ctx.getTodayDateString()
-  });
-
-  const clearBtn = popover.createEl('button', {
-    cls: 'gtd-btn-sm',
-    text: 'Clear'
-  });
-
-  anchor.parentElement?.appendChild(popover);
-  dateInput.focus();
-
-  dateInput.addEventListener('change', async () => {
-    await ctx.taskMutator.setDueDate(task, dateInput.value || null);
-    popover.remove();
-  });
-
-  clearBtn.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    await ctx.taskMutator.setDueDate(task, null);
-    popover.remove();
-  });
-
-  popover.addEventListener('mouseleave', () => {
-    popover.remove();
+  showCalendarPicker(anchor, {
+    currentDate: task.dueDate,
+    todayDate: ctx.getTodayDateString(),
+    onSelect: async (date) => {
+      await ctx.taskMutator.setDueDate(task, date);
+    }
   });
 }
 
 function showStartDatePicker(anchor: HTMLElement, task: TaskItem, ctx: ViewContext): void {
-  const popover = createDiv({ cls: 'gtd-date-popover' });
-  const dateInput = popover.createEl('input', {
-    type: 'date',
-    cls: 'gtd-date-input',
-    value: task.startDate || ctx.getTodayDateString()
-  });
-
-  const clearBtn = popover.createEl('button', {
-    cls: 'gtd-btn-sm',
-    text: 'Clear'
-  });
-
-  anchor.parentElement?.appendChild(popover);
-  dateInput.focus();
-
-  dateInput.addEventListener('change', async () => {
-    await ctx.taskMutator.setStartDate(task, dateInput.value || null);
-    popover.remove();
-  });
-
-  clearBtn.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    await ctx.taskMutator.setStartDate(task, null);
-    popover.remove();
-  });
-
-  popover.addEventListener('mouseleave', () => {
-    popover.remove();
+  showCalendarPicker(anchor, {
+    currentDate: task.startDate,
+    todayDate: ctx.getTodayDateString(),
+    onSelect: async (date) => {
+      await ctx.taskMutator.setStartDate(task, date);
+    }
   });
 }
