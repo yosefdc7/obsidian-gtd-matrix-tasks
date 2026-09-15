@@ -4,9 +4,19 @@
 Port the approved **Stream UI** direction into the plugin on the ADR 0005 modular renderers (ADR 0008): the List layout becomes the Stream list, shared chrome (header, NL quick-add, role chips, every add-composer, quick-capture modal) gets the Stream treatment, and secondary toolbar controls move behind an options disclosure. The Board keeps its kanban structure (drag-drop, swimlanes, mobile carousel untouched). Source design: `2nd Brain/prototypes/gtd-ui/refined-stream.html` (untouched).
 
 ## Status
-Implementation complete and **committed** (`1703010 feat: add Stream list UI with natural-language quick add`; docs commit follows). Live-verified against `2nd brain v7`; 185/185 tests, `tsc --noEmit` clean. Previous HEAD was `55d7624` (By Date delivery).
+Minimalist month date calendar picker popover delivered and committed (`66bcdf4 [antigravity] feat: add minimalist month date calendar picker popover`). Stream UI delivery complete (ADR 0008). Live-verified against `2nd brain v7` (185/185 tests, `tsc --noEmit` clean, DOM inspection verified).
 
 ## Completed
+- `src/view/calendar-picker.ts` (new): Minimalist month grid date calendar picker popover (`showCalendarPicker`).
+  - Monday-first 7-column calendar grid with `<` and `>` month navigation.
+  - Formats ISO `YYYY-MM-DD`, detects today (`is-today`) and selected date (`is-selected`).
+  - 1-click select immediately calls `onSelect` and mutates date on task.
+  - Clicking currently selected date deselects it (sets to null); discreet "Clear date" button in footer also provided.
+  - Automatic positioning below anchor with viewport edge protection.
+  - Escape key or outside click (`pointerdown`) immediately dismisses popover.
+- `src/view/card-renderer.ts`: Replaced legacy `<input type="date">` in `showScheduledDatePicker`, `showDueDatePicker`, and `showStartDatePicker` with `showCalendarPicker`.
+- `styles.css`: Added styles for `.gtd-calendar-popover`, `.gtd-cal-header`, `.gtd-cal-title`, `.gtd-cal-nav-btn`, `.gtd-cal-weekdays`, `.gtd-cal-days`, `.gtd-cal-day`, `.gtd-cal-footer`, `.gtd-cal-clear-btn` matching Obsidian theme CSS variables.
+- Verified live in `2nd brain v7` via CDP and screenshot inspection. Commit: `66bcdf4`.
 - `src/nl-input.ts` (new, pure, zero obsidian imports): `parseNaturalLanguageInput` (`today`/`tomorrow`/`next week` → +0/+1/+7 UTC-stable; `p1..p4` → highest/high/medium/low; `#yo/#yomanager/#josef/#josefselfcare/#rj/#rjsupportive/#untagged` + spelled phrases → RoleId; tokens stripped, fallback to original text; unknown tokens kept) and `previewDestinationLabel` (synthesized task through the real classifiers → "adds to …" chip label).
 - `src/view/composer.ts` (new): `renderParseChips` (date/priority/role/destination chips + empty-state hint), `renderQuickAddRow` / `renderDateQuickAddRow` moved from `card-renderer.ts`; board columns + date buckets keep always-visible inputs, list/swimlane sections use the collapsed `+ Add task` reveal (Enter commits, Esc closes/clears); chip updates are local DOM (no `setState`), so typing never loses focus.
 - Mutator (`src/store/task-mutator.ts`): optional `parsed` overlay on `quickAddTask` / `quickAddTaskDated` with precedence role `parsed.role ?? lane` · priority `quadrant ?? parsed ?? section` · date `parsed ?? section`; new `deleteTaskLine(task)` (exact index → trimmed → 25-char fuzzy, splice + save + reindex; children left in place).
