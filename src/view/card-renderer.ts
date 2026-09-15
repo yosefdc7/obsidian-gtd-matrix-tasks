@@ -1,0 +1,491 @@
+import { MarkdownRenderer, setIcon } from 'obsidian';
+import { showMoveColumnMenu, showPriorityMenu, showTaskActionMenu } from './task-menus';
+import type { ViewContext } from './types';
+import type { RoleId, SectionId, TaskItem, TaskPriority } from '../types';
+
+function getPriorityLabel(prio: TaskPriority): string {
+  switch (prio) {
+    case 'highest':
+      return 'Urgent · Important';
+    case 'high':
+      return 'Important';
+    case 'medium':
+      return 'Urgent';
+    case 'low':
+    case 'lowest':
+      return 'Low Priority';
+    default:
+      return '+ Priority';
+  }
+}
+
+/** Kanban board card with drag handle, checkbox, priority badge and action buttons. */
+export function renderBoardCard(container: HTMLElement, task: TaskItem, ctx: ViewContext): void {
+  const today = ctx.getTodayDateString();
+  const card = container.createDiv({
+    cls: `gtd-board-card ${task.isCompleted ? 'is-completed' : ''} ${task.isProject ? 'is-project-task' : ''}`
+  });
+
+  card.draggable = true;
+  card.addEventListener('dragstart', (e) => {
+    if (e.dataTransfer) {
+      e.dataTransfer.setData('text/plain', task.id);
+      e.dataTransfer.effectAllowed = 'move';
+    }
+    card.addClass('is-dragging');
+  });
+  card.addEventListener('dragend', () => card.removeClass('is-dragging'));
+
+  // Top row: checkbox + priority badge + action menu button
+  const topRow = card.createDiv({ cls: 'gtd-board-card-top' });
+  const checkbox = topRow.createEl('input', { type: 'checkbox', cls: 'gtd-checkbox' });
+  checkbox.checked = task.isCompleted;
+  checkbox.addEventListener('change', async (e) => {
+    e.stopPropagation();
+    await ctx.taskMutator.setCompletion(task, checkbox.checked);
+  });
+
+  const priorityBtn = topRow.createEl('button', {
+    cls: `gtd-priority-badge priority-${task.priority}`,
+    attr: { 'aria-label': 'Change priority' }
+  });
+  priorityBtn.setText(getPriorityLabel(task.priority));
+  priorityBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showPriorityMenu(e, task, ctx);
+  });
+
+  const moveColBtn = topRow.createEl('button', {
+    cls: 'gtd-move-col-btn',
+    attr: { 'aria-label': 'Move to column' }
+  });
+  setIcon(moveColBtn, 'columns');
+  moveColBtn.title = 'Move task to column';
+  moveColBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showMoveColumnMenu(e, task, ctx);
+  });
+
+  const actionBtn = topRow.createEl('button', {
+    cls: 'gtd-card-action-btn',
+    attr: { 'aria-label': 'Task actions' }
+  });
+  setIcon(actionBtn, 'more-horizontal');
+  actionBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showTaskActionMenu(e, task, ctx);
+  });
+
+  // Description
+  const descEl = card.createDiv({ cls: 'gtd-board-card-desc' });
+  if (task.description) {
+    void MarkdownRenderer.render(ctx.app, task.description, descEl, task.filePath, ctx.component);
+  } else {
+    descEl.setText('(No description)');
+  }
+  descEl.addEventListener('click', (e) => {
+    const anchor = (e.target as HTMLElement).closest('a');
+    if (anchor) {
+      e.preventDefault();
+      e.stopPropagation();
+      const href = anchor.getAttribute('data-href') || anchor.getAttribute('href');
+      if (!href) return;
+      const isExternal = /^(https?:|\/\/)/.test(href);
+      if (isExternal) window.open(href, '_blank');
+      else void ctx.app.workspace.openLinkText(href, task.filePath, 'tab');
+      return;
+    }
+    e.stopPropagation();
+    makeEditable(descEl, task, ctx);
+  });
+
+  // Meta row: dates + source file + role badge
+  const metaEl = card.createDiv({ cls: 'gtd-board-card-meta' });
+
+  // Role badge
+  if (task.effectiveRole && task.effectiveRole !== 'untagged') {
+    const roleBadge = metaEl.createSpan({
+      cls: `gtd-role-badge badge-${task.effectiveRole.replace('/', '-')}`,
+      text:
+        task.effectiveRole === 'role/yo-manager'
+          ? 'Yo Manager'
+          : task.effectiveRole === 'role/josef-selfcare'
+          ? 'Josef Self-Care'
+          : 'RJ Supportive'
+    });
+    roleBadge.title = `Role source: ${task.roleSource}`;
+  }
+
+  if (task.scheduledDate) {
+    const isOverdue = !task.isCompleted && task.scheduledDate < today;
+    metaEl.createEl('button', {
+      cls: `gtd-date-pill gtd-date-scheduled ${isOverdue ? 'is-overdue' : ''}`,
+      text: `⏳ ${task.scheduledDate}`
+    }).addEventListener('click', (e) => { e.stopPropagation(); showScheduledDatePicker(e.target as HTMLElement, task, ctx); });
+  }
+  if (task.dueDate) {
+    const isOverdue = !task.isCompleted && task.dueDate < today;
+    metaEl.createEl('button', {
+      cls: `gtd-date-pill gtd-date-due ${isOverdue ? 'is-overdue' : ''}`,
+      text: `📅 ${task.dueDate}`
+    }).addEventListener('click', (e) => { e.stopPropagation(); showDueDatePicker(e.target as HTMLElement, task, ctx); });
+  }
+
+  const fileLink = metaEl.createEl('a', {
+    cls: `gtd-file-link ${task.isProject ? 'is-project-link' : ''}`,
+    text: task.isProject ? `📂 ${task.fileName}` : `[[${task.fileName}]]`
+  });
+  fileLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void ctx.app.workspace.openLinkText(task.filePath, '', 'tab');
+  });
+}
+
+/** Accordion list row with meta pills, description edit and hover-link support. */
+export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: ViewContext): void {
+  const itemEl = container.createDiv({
+    cls: `gtd-task-item ${task.isCompleted ? 'is-completed' : ''} ${task.isProject ? 'is-project-task' : ''}`
+  });
+
+  itemEl.draggable = true;
+  itemEl.addEventListener('dragstart', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('a') || target.closest('button') || target.closest('input') || target.closest('.gtd-desc-inline-input')) {
+      e.preventDefault();
+      return;
+    }
+    if (e.dataTransfer) {
+      e.dataTransfer.setData('text/plain', task.id);
+      e.dataTransfer.effectAllowed = 'move';
+    }
+    itemEl.addClass('is-dragging');
+  });
+
+  itemEl.addEventListener('dragend', () => {
+    itemEl.removeClass('is-dragging');
+  });
+
+  // Checkbox
+  const checkbox = itemEl.createEl('input', {
+    type: 'checkbox',
+    cls: 'gtd-checkbox'
+  });
+  checkbox.checked = task.isCompleted;
+  checkbox.addEventListener('change', async (e) => {
+    e.stopPropagation();
+    await ctx.taskMutator.setCompletion(task, checkbox.checked);
+  });
+
+  // Priority color pill
+  const priorityBtn = itemEl.createEl('button', {
+    cls: `gtd-priority-badge priority-${task.priority}`,
+    attr: { 'aria-label': 'Change priority' }
+  });
+  priorityBtn.setText(getPriorityLabel(task.priority));
+  priorityBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showPriorityMenu(e, task, ctx);
+  });
+
+  const moveColBtn = itemEl.createEl('button', {
+    cls: 'gtd-move-col-btn',
+    attr: { 'aria-label': 'Move to column' }
+  });
+  setIcon(moveColBtn, 'columns');
+  moveColBtn.title = 'Move task to column';
+  moveColBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showMoveColumnMenu(e, task, ctx);
+  });
+
+  // Description (rendered markdown with smart click routing)
+  const descEl = itemEl.createDiv({ cls: 'gtd-task-desc' });
+  if (task.description) {
+    void MarkdownRenderer.render(ctx.app, task.description, descEl, task.filePath, ctx.component);
+  } else {
+    descEl.setText('(No description)');
+  }
+  descEl.title = 'Click to edit description (or click links to open in a new tab)';
+
+  descEl.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const anchor = target.closest('a');
+    if (anchor) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const href = anchor.getAttribute('data-href') || anchor.getAttribute('href');
+      if (!href) return;
+
+      const isExternal = anchor.classList.contains('external-link') || /^(https?:|\/\/)/i.test(href);
+      if (isExternal) {
+        window.open(href, '_blank');
+      } else {
+        void ctx.app.workspace.openLinkText(href, task.filePath, 'tab');
+      }
+      return;
+    }
+
+    e.stopPropagation();
+    makeEditable(descEl, task, ctx);
+  });
+
+  descEl.addEventListener('mouseover', (event: MouseEvent) => {
+    const target = event.target as HTMLElement;
+    const anchor = target.closest('a');
+    if (anchor) {
+      const href = anchor.getAttribute('data-href') || anchor.getAttribute('href');
+      const isExternal = anchor.classList.contains('external-link') || (href ? /^(https?:|\/\/)/i.test(href) : false);
+      if (href && !isExternal) {
+        ctx.app.workspace.trigger('hover-link', {
+          event,
+          source: 'gtd-matrix-tasks',
+          hoverParent: descEl,
+          targetEl: anchor,
+          linktext: href,
+          sourcePath: task.filePath
+        });
+      }
+    }
+  });
+
+  // Action menu button
+  const actionBtn = itemEl.createEl('button', {
+    cls: 'gtd-card-action-btn',
+    attr: { 'aria-label': 'Task actions' }
+  });
+  setIcon(actionBtn, 'more-horizontal');
+  actionBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showTaskActionMenu(e, task, ctx);
+  });
+
+  // Edit button on hover
+  const editBtn = itemEl.createEl('button', {
+    cls: 'gtd-edit-btn',
+    attr: { 'aria-label': 'Edit task text' }
+  });
+  setIcon(editBtn, 'pencil');
+  editBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    makeEditable(descEl, task, ctx);
+  });
+
+  // Meta row (Scheduled Date + Due Date + Project badge / Note link)
+  const metaEl = itemEl.createDiv({ cls: 'gtd-task-meta' });
+  const today = ctx.getTodayDateString();
+
+  // 1. Scheduled Date Pill (⏳ Primary)
+  if (task.scheduledDate) {
+    const isOverdue = !task.isCompleted && task.scheduledDate < today;
+    const isToday = task.scheduledDate === today;
+
+    const schedPill = metaEl.createEl('button', {
+      cls: `gtd-date-pill gtd-date-scheduled ${isOverdue ? 'is-overdue' : ''} ${isToday ? 'is-today' : ''}`,
+      text: `⏳ ${task.scheduledDate}`
+    });
+    schedPill.title = 'Click to change scheduled date';
+    schedPill.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showScheduledDatePicker(schedPill, task, ctx);
+    });
+  } else {
+    const addSchedBtn = metaEl.createEl('button', {
+      cls: 'gtd-date-pill gtd-date-add',
+      text: '+ Scheduled'
+    });
+    addSchedBtn.title = 'Add scheduled date (⏳)';
+    addSchedBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showScheduledDatePicker(addSchedBtn, task, ctx);
+    });
+  }
+
+  // 2. Due Date Pill (📅 if present)
+  if (task.dueDate) {
+    const isOverdue = !task.isCompleted && task.dueDate < today;
+    const isToday = task.dueDate === today;
+
+    const duePill = metaEl.createEl('button', {
+      cls: `gtd-date-pill gtd-date-due ${isOverdue ? 'is-overdue' : ''} ${isToday ? 'is-today' : ''}`,
+      text: `📅 ${task.dueDate}`
+    });
+    duePill.title = 'Click to change due date';
+    duePill.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showDueDatePicker(duePill, task, ctx);
+    });
+  }
+
+  // Origin note / Project link
+  const fileLink = metaEl.createEl('a', {
+    cls: `gtd-file-link ${task.isProject ? 'is-project-link' : ''}`,
+    text: task.isProject ? `📂 ${task.fileName}` : `[[${task.fileName}]]`
+  });
+  fileLink.title = `Open ${task.filePath} in a new tab`;
+  fileLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void ctx.app.workspace.openLinkText(task.filePath, '', 'tab');
+  });
+  fileLink.addEventListener('mouseover', (event: MouseEvent) => {
+    ctx.app.workspace.trigger('hover-link', {
+      event,
+      source: 'gtd-matrix-tasks',
+      hoverParent: metaEl,
+      targetEl: fileLink,
+      linktext: task.filePath,
+      sourcePath: ''
+    });
+  });
+
+  // Role badge
+  if (task.effectiveRole && task.effectiveRole !== 'untagged') {
+    const roleBadge = metaEl.createSpan({
+      cls: `gtd-role-badge badge-${task.effectiveRole.replace('/', '-')}`,
+      text:
+        task.effectiveRole === 'role/yo-manager'
+          ? 'Yo Manager'
+          : task.effectiveRole === 'role/josef-selfcare'
+          ? 'Josef Self-Care'
+          : 'RJ Supportive'
+    });
+    roleBadge.title = `Role source: ${task.roleSource}`;
+  }
+}
+
+function makeEditable(descEl: HTMLElement, task: TaskItem, ctx: ViewContext): void {
+  if (descEl.querySelector('input')) return;
+
+  const originalText = task.description;
+  const input = createEl('input', {
+    type: 'text',
+    cls: 'gtd-desc-inline-input',
+    value: originalText
+  });
+
+  descEl.innerHTML = '';
+  descEl.appendChild(input);
+  input.focus();
+  input.select();
+
+  const restoreStatic = () => {
+    descEl.innerHTML = '';
+    if (originalText) {
+      void MarkdownRenderer.render(ctx.app, originalText, descEl, task.filePath, ctx.component);
+    } else {
+      descEl.setText('(No description)');
+    }
+  };
+
+  let committed = false;
+  const save = async () => {
+    if (committed) return;
+    committed = true;
+    const newText = input.value.trim();
+    if (newText && newText !== originalText) {
+      await ctx.taskMutator.setDescription(task, newText);
+    } else {
+      restoreStatic();
+    }
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      save();
+    } else if (e.key === 'Escape') {
+      committed = true;
+      restoreStatic();
+    }
+  });
+
+  input.addEventListener('blur', save);
+}
+
+function showScheduledDatePicker(anchor: HTMLElement, task: TaskItem, ctx: ViewContext): void {
+  const popover = createDiv({ cls: 'gtd-date-popover' });
+  const dateInput = popover.createEl('input', {
+    type: 'date',
+    cls: 'gtd-date-input',
+    value: task.scheduledDate || ctx.getTodayDateString()
+  });
+
+  const clearBtn = popover.createEl('button', {
+    cls: 'gtd-btn-sm',
+    text: 'Clear'
+  });
+
+  anchor.parentElement?.appendChild(popover);
+  dateInput.focus();
+
+  dateInput.addEventListener('change', async () => {
+    await ctx.taskMutator.setScheduledDate(task, dateInput.value || null);
+    popover.remove();
+  });
+
+  clearBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await ctx.taskMutator.setScheduledDate(task, null);
+    popover.remove();
+  });
+
+  popover.addEventListener('mouseleave', () => {
+    popover.remove();
+  });
+}
+
+function showDueDatePicker(anchor: HTMLElement, task: TaskItem, ctx: ViewContext): void {
+  const popover = createDiv({ cls: 'gtd-date-popover' });
+  const dateInput = popover.createEl('input', {
+    type: 'date',
+    cls: 'gtd-date-input',
+    value: task.dueDate || ctx.getTodayDateString()
+  });
+
+  const clearBtn = popover.createEl('button', {
+    cls: 'gtd-btn-sm',
+    text: 'Clear'
+  });
+
+  anchor.parentElement?.appendChild(popover);
+  dateInput.focus();
+
+  dateInput.addEventListener('change', async () => {
+    await ctx.taskMutator.setDueDate(task, dateInput.value || null);
+    popover.remove();
+  });
+
+  clearBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    await ctx.taskMutator.setDueDate(task, null);
+    popover.remove();
+  });
+
+  popover.addEventListener('mouseleave', () => {
+    popover.remove();
+  });
+}
+
+/** Per-column "+ Add task" input row; roleTag binds quick-added tasks to a swimlane. */
+export function renderQuickAddRow(
+  container: HTMLElement,
+  secId: SectionId,
+  roleTag: string | null | undefined,
+  ctx: ViewContext
+): void {
+  const quickAddEl = container.createDiv({ cls: 'gtd-quick-add-row' });
+  const input = quickAddEl.createEl('input', {
+    type: 'text',
+    cls: 'gtd-quick-add-input',
+    placeholder: '+ Add task (press Enter)...'
+  });
+
+  input.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter' && input.value.trim()) {
+      const text = input.value.trim();
+      input.value = '';
+      await ctx.taskMutator.quickAddTask(secId, text, (roleTag as RoleId) || null);
+    }
+  });
+}

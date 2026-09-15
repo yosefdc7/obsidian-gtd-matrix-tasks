@@ -1,0 +1,169 @@
+import { setIcon } from 'obsidian';
+import { getEisenhowerSection, getGTDSection, sortTasks } from '../parser';
+import { renderQuickAddRow, renderTaskItem } from './card-renderer';
+import { ROLE_SWIMLANES } from './types';
+import type { ViewContext } from './types';
+import type { RoleId, SectionDefinition, SectionId, TaskItem } from '../types';
+
+/** Collapsible accordion section with drop zone, task rows and quick add. */
+export function renderSection(
+  container: HTMLElement,
+  sec: SectionDefinition,
+  tasks: TaskItem[],
+  roleTag: string | null | undefined,
+  ctx: ViewContext
+): void {
+  const isCollapsed = ctx.getState().collapsedSections.has(sec.id);
+  const sectionEl = container.createDiv({
+    cls: `gtd-section ${sec.badgeClass} ${isCollapsed ? 'collapsed' : ''}`
+  });
+
+  // Header
+  const headerEl = sectionEl.createDiv({ cls: 'gtd-section-header' });
+
+  const toggleIcon = headerEl.createSpan({ cls: 'gtd-toggle-icon' });
+  setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+
+  const titleGroup = headerEl.createDiv({ cls: 'gtd-title-group' });
+  titleGroup.createSpan({ cls: 'gtd-section-title', text: sec.title });
+  titleGroup.createSpan({
+    cls: 'gtd-count-badge',
+    text: String(tasks.length)
+  });
+
+  headerEl.createDiv({
+    cls: 'gtd-section-subtitle',
+    text: sec.subtitle
+  });
+
+  headerEl.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+    const collapsed = new Set(ctx.getState().collapsedSections);
+    if (collapsed.has(sec.id)) {
+      collapsed.delete(sec.id);
+    } else {
+      collapsed.add(sec.id);
+    }
+    ctx.setState({ collapsedSections: collapsed });
+  });
+
+  // Drag-and-Drop on Section
+  sectionEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
+    sectionEl.addClass('gtd-drag-over');
+  });
+
+  sectionEl.addEventListener('dragleave', () => {
+    sectionEl.removeClass('gtd-drag-over');
+  });
+
+  sectionEl.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    sectionEl.removeClass('gtd-drag-over');
+
+    const taskId = e.dataTransfer?.getData('text/plain');
+    if (!taskId) return;
+
+    const task = ctx.taskStore.getTasks().find((t) => t.id === taskId);
+    if (!task) return;
+
+    // Swimlane list drops fold the role change into the single transition write
+    await ctx.handleTaskDrop(task, sec.id, roleTag as RoleId | null | undefined);
+  });
+
+  // Body
+  if (!isCollapsed) {
+    const bodyEl = sectionEl.createDiv({ cls: 'gtd-section-body' });
+
+    if (tasks.length === 0) {
+      bodyEl.createDiv({
+        cls: 'gtd-empty-state',
+        text: 'No tasks here. Drop a task or add one below.'
+      });
+    } else {
+      const sorted = sortTasks(tasks, ctx.getState().sortCriteria);
+
+      for (const task of sorted) {
+        renderTaskItem(bodyEl, task, ctx);
+      }
+    }
+
+    renderQuickAddRow(bodyEl, sec.id, roleTag, ctx);
+  }
+}
+
+/** Role swimlanes, each stacking the active-mode accordion sections. */
+export function renderSwimlaneList(
+  container: HTMLElement,
+  sections: SectionDefinition[],
+  tasks: TaskItem[],
+  todayStr: string,
+  ctx: ViewContext
+): void {
+  const state = ctx.getState();
+  const wrapper = container.createDiv({ cls: 'gtd-swimlanes-list-wrapper' });
+
+  for (const lane of ROLE_SWIMLANES) {
+    if (!state.activeFilterRoles.has(lane.id)) continue;
+
+    const laneTasks = tasks.filter((t) => t.effectiveRole === lane.id);
+    if (lane.id === 'untagged' && laneTasks.length === 0) continue;
+
+    const isCollapsed = state.collapsedSwimlanes.has(lane.id);
+    const laneEl = wrapper.createDiv({
+      cls: `gtd-swimlane-list-group ${lane.badgeClass} ${isCollapsed ? 'is-collapsed' : ''}`
+    });
+
+    // Role Header
+    const headerEl = laneEl.createDiv({ cls: 'gtd-swimlane-list-header' });
+    const toggleIcon = headerEl.createSpan({ cls: 'gtd-toggle-icon' });
+    setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+
+    const iconSpan = headerEl.createSpan({ cls: 'gtd-swimlane-icon' });
+    setIcon(iconSpan, lane.icon);
+
+    const titleGroup = headerEl.createDiv({ cls: 'gtd-swimlane-title-group' });
+    titleGroup.createSpan({ cls: 'gtd-swimlane-title', text: lane.title });
+    titleGroup.createSpan({ cls: 'gtd-count-badge', text: String(laneTasks.length) });
+
+    headerEl.createDiv({ cls: 'gtd-swimlane-subtitle', text: lane.subtitle });
+
+    headerEl.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+      const collapsed = new Set(ctx.getState().collapsedSwimlanes);
+      if (collapsed.has(lane.id)) {
+        collapsed.delete(lane.id);
+      } else {
+        collapsed.add(lane.id);
+      }
+      ctx.setState({ collapsedSwimlanes: collapsed });
+    });
+
+    if (isCollapsed) continue;
+
+    // Group lane tasks by section
+    const laneGrouped = new Map<SectionId, TaskItem[]>();
+    for (const sec of sections) {
+      laneGrouped.set(sec.id, []);
+    }
+
+    for (const t of laneTasks) {
+      const secId =
+        state.viewMode === 'gtd'
+          ? getGTDSection(t, todayStr)
+          : getEisenhowerSection(t, todayStr);
+      if (secId) {
+        laneGrouped.get(secId)?.push(t);
+      }
+    }
+
+    const bodyEl = laneEl.createDiv({ cls: 'gtd-swimlane-list-body' });
+    for (const sec of sections) {
+      const secTasks = laneGrouped.get(sec.id) || [];
+      renderSection(bodyEl, sec, secTasks, lane.roleTag, ctx);
+    }
+  }
+}

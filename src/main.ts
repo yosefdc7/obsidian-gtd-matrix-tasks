@@ -1,6 +1,6 @@
 import { Plugin, WorkspaceLeaf, MarkdownView, TFile, TAbstractFile, debounce, Notice } from 'obsidian';
 import { VaultScanner } from './vault-scanner';
-import { GTDMatrixView, VIEW_TYPE_GTD_MATRIX } from './view';
+import { GTDMatrixView, VIEW_TYPE_GTD_MATRIX } from './view/view';
 import { GTDMatrixSettingTab } from './settings-tab';
 import { PluginSettings, DEFAULT_SETTINGS } from './types';
 import { isDateTitledNote } from './date-utils';
