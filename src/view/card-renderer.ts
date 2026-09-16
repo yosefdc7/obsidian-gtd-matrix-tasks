@@ -1,5 +1,6 @@
 import { MarkdownRenderer, setIcon } from 'obsidian';
 import { showCalendarPicker } from './calendar-picker';
+import { attachInlineSuggest } from './inline-suggest';
 import { showMoveColumnMenu, showPriorityMenu, showStatusMenu, showTaskActionMenu } from './task-menus';
 import type { ViewContext } from './types';
 import type { TaskItem, TaskPriority } from '../types';
@@ -397,7 +398,10 @@ function makeEditable(descEl: HTMLElement, task: TaskItem, ctx: ViewContext): vo
   input.focus();
   input.select();
 
+  const suggestHandle = attachInlineSuggest(input, ctx.app);
+
   const restoreStatic = () => {
+    suggestHandle.destroy();
     descEl.innerHTML = '';
     if (originalText) {
       void MarkdownRenderer.render(ctx.app, originalText, descEl, task.filePath, ctx.component);
@@ -410,6 +414,7 @@ function makeEditable(descEl: HTMLElement, task: TaskItem, ctx: ViewContext): vo
   const save = async () => {
     if (committed) return;
     committed = true;
+    suggestHandle.destroy();
     const newText = input.value.trim();
     if (newText && newText !== originalText) {
       await ctx.taskMutator.setDescription(task, newText);
@@ -420,8 +425,10 @@ function makeEditable(descEl: HTMLElement, task: TaskItem, ctx: ViewContext): vo
 
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
+      if (suggestHandle.isOpen()) return;
       save();
     } else if (e.key === 'Escape') {
+      if (suggestHandle.isOpen()) return;
       committed = true;
       restoreStatic();
     }
