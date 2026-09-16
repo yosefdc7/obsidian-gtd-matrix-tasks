@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type GTDMatrixPlugin from './main';
-import { ViewMode, LayoutMode, SortCriteria, TagViewMode } from './types';
+import { ViewMode, LayoutMode, SortCriteria, TagViewMode, DateAnchorField } from './types';
 import { parseConfiguredRoles } from './parser';
 
 export class GTDMatrixSettingTab extends PluginSettingTab {
@@ -22,12 +22,27 @@ export class GTDMatrixSettingTab extends PluginSettingTab {
       .setDesc('Choose the default view when opening GTD Matrix Tasks.')
       .addDropdown((dropdown) => {
         dropdown
+          .addOption('date', 'By Date (date buckets)')
           .addOption('gtd', 'GTD Workflow (6 stages)')
           .addOption('eisenhower', 'Eisenhower Matrix (4 quadrants)')
-          .addOption('date', 'By Date (date buckets)')
-          .setValue(this.plugin.settings.defaultViewMode || 'gtd')
+          .setValue(this.plugin.settings.defaultViewMode || 'date')
           .onChange(async (value) => {
             this.plugin.settings.defaultViewMode = value as ViewMode;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName('Default date anchor')
+      .setDesc('Choose the default anchor field when using By Date view mode.')
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('scheduled', 'Scheduled (⏳)')
+          .addOption('start', 'Start (🛫)')
+          .addOption('due', 'Due (📅)')
+          .setValue(this.plugin.settings.defaultDateAnchor || 'scheduled')
+          .onChange(async (value) => {
+            this.plugin.settings.defaultDateAnchor = value as DateAnchorField;
             await this.plugin.saveSettings();
           });
       });

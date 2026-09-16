@@ -82,6 +82,7 @@ export interface PluginSettings {
   autoAddCreatedDate: boolean;
   defaultDailyNoteFolder: string;
   defaultViewMode: ViewMode;
+  defaultDateAnchor: DateAnchorField;
   defaultLayoutMode: LayoutMode;
   defaultSortCriteria: SortCriteria;
   defaultTagViewMode: TagViewMode;
@@ -104,7 +105,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   ],
   autoAddCreatedDate: false,
   defaultDailyNoteFolder: 'Jots',
-  defaultViewMode: 'gtd',
+  defaultViewMode: 'date',
+  defaultDateAnchor: 'scheduled',
   defaultLayoutMode: 'board',
   defaultSortCriteria: 'date',
   defaultTagViewMode: 'filter',

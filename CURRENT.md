@@ -4,7 +4,7 @@
 Port the approved **Stream UI** direction into the plugin on the ADR 0005 modular renderers (ADR 0008): the List layout becomes the Stream list, shared chrome (header, NL quick-add, role chips, every add-composer, quick-capture modal) gets the Stream treatment, and secondary toolbar controls move behind an options disclosure. The Board keeps its kanban structure (drag-drop, swimlanes, mobile carousel untouched). Source design: `2nd Brain/prototypes/gtd-ui/refined-stream.html` (untouched).
 
 ## Status
-Delivered and committed configurable role tags setting, "All" pill filter, and exclusive radio-style role filtering with multi-select modifiers (`[antigravity] feat: add 'All' pill, exclusive radio filter, and settings-configurable role tags`). Live-verified against `2nd brain v7` (189/189 tests, `tsc --noEmit` clean, DOM inspection and CDP click tests verified).
+Set default view mode to "By Date" anchored to "Scheduled" date (`[antigravity] feat: default view mode to By Date (Scheduled)`). Configurable role tags setting, "All" pill filter, and exclusive radio-style role filtering delivered and verified (`189/189` tests, `tsc --noEmit` exit 0).
 
 ## Completed
 - Role Filter Pills & Filtering:

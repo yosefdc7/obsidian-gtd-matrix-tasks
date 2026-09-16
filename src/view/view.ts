@@ -33,7 +33,7 @@ export class GTDMatrixView extends ItemView {
     this.settings = settings ?? DEFAULT_SETTINGS;
     this.saveSettingsHandler = saveSettingsHandler;
     this.viewState = {
-      viewMode: 'gtd',
+      viewMode: 'date',
       layoutMode: 'board',
       sortCriteria: 'date',
       tagViewMode: 'filter',
@@ -54,7 +54,8 @@ export class GTDMatrixView extends ItemView {
 
     if (settings) {
       this.viewState.layoutMode = settings.defaultLayoutMode;
-      this.viewState.viewMode = settings.defaultViewMode;
+      this.viewState.viewMode = settings.defaultViewMode || 'date';
+      this.viewState.dateAnchor = settings.defaultDateAnchor || 'scheduled';
       this.viewState.sortCriteria = settings.defaultSortCriteria || 'date';
       this.viewState.tagViewMode = settings.defaultTagViewMode || 'filter';
       if (settings.activeFilterRoles && settings.activeFilterRoles.length > 0) {
