@@ -4,6 +4,7 @@ import { TaskStore } from './store/task-store';
 import { RoleResolver, ResolvedRole } from './store/role-resolver';
 import { ScanEngine } from './store/scan-engine';
 import { TaskMutator } from './store/task-mutator';
+import { parseConfiguredRoles } from './parser';
 
 export class VaultScanner {
   public store: TaskStore;
@@ -15,7 +16,7 @@ export class VaultScanner {
 
   constructor(app: App, settings: PluginSettings) {
     this.store = new TaskStore();
-    this.roleResolver = new RoleResolver(app);
+    this.roleResolver = new RoleResolver(app, parseConfiguredRoles(settings.configuredRoleTags));
     this.scanEngine = new ScanEngine(app, settings, this.store, this.roleResolver);
     this.mutator = new TaskMutator(app, settings, this.scanEngine);
 
@@ -32,6 +33,7 @@ export class VaultScanner {
   }
 
   public updateSettings(settings: PluginSettings): void {
+    this.roleResolver.setConfiguredRoles(parseConfiguredRoles(settings.configuredRoleTags));
     this.scanEngine.updateSettings(settings);
     this.mutator.updateSettings(settings);
   }

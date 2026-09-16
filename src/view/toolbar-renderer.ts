@@ -1,5 +1,6 @@
 import { setIcon } from 'obsidian';
 import { parseNaturalLanguageInput, previewDestinationLabel } from '../nl-input';
+import { parseConfiguredRoles, getRoleColor } from '../parser';
 import { renderParseChips } from './composer';
 import type { ViewContext } from './types';
 import type { DateAnchorField, RoleId, SortCriteria, TaskItem } from '../types';
@@ -305,33 +306,65 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
     requestAnimationFrame(refocus);
   }
 
-  // Role chips row (dot + label; toggles the active role filter)
+  // Role chips row (All pill + configured role pills + Untagged pill)
   const roleChipsWrapper = toolbar.createDiv({ cls: 'gtd-role-chips-wrapper' });
-  const roleList: { id: RoleId; label: string }[] = [
-    { id: 'role/yo-manager', label: 'Yo Manager' },
-    { id: 'role/josef-selfcare', label: 'Josef Self-Care' },
-    { id: 'role/rj-supportive', label: 'RJ Supportive' },
-    { id: 'untagged', label: 'Untagged' }
+  const configured = parseConfiguredRoles(ctx.settings.configuredRoleTags);
+  const roleList: { id: RoleId; label: string; color: string }[] = [
+    ...configured.map((c, i) => ({ id: c.id, label: c.label, color: getRoleColor(c.id, i) })),
+    { id: 'untagged', label: 'Untagged', color: getRoleColor('untagged') }
   ];
+  const allRoleIds = roleList.map((r) => r.id);
+  const isAllActive = allRoleIds.every((id) => state.activeFilterRoles.has(id));
+
+  // 1. "All" Pill
+  const allPill = roleChipsWrapper.createEl('button', {
+    cls: `gtd-role-chip-btn gtd-role-chip-all ${isAllActive ? 'is-active' : ''}`,
+    attr: { 'aria-label': 'Show all roles' }
+  });
+  allPill.title = 'Show all roles';
+  allPill.createSpan({ cls: 'gtd-role-chip-label', text: 'All' });
+  allPill.addEventListener('click', () => {
+    ctx.setState({ activeFilterRoles: new Set(allRoleIds) });
+  });
+
+  // 2. Role Pills
   for (const r of roleList) {
+    const isSoloActive = state.activeFilterRoles.has(r.id) && state.activeFilterRoles.size === 1;
     const isActive = state.activeFilterRoles.has(r.id);
     const pill = roleChipsWrapper.createEl('button', {
       cls: `gtd-role-chip-btn ${isActive ? 'is-active' : ''} chip-${r.id.replace('/', '-')}`,
-      attr: { 'aria-label': `${isActive ? 'Exclude' : 'Include'} ${r.label}` }
+      attr: { 'aria-label': `Filter by ${r.label}` }
     });
-    pill.title = isActive ? `Exclude ${r.label}` : `Include ${r.label}`;
-    pill.createSpan({ cls: 'gtd-role-chip-dot' });
+    pill.style.setProperty('--role-color', r.color);
+    pill.addClass('has-custom-color');
+    pill.title = isSoloActive ? `Showing only ${r.label} (click to show all)` : `Filter by ${r.label}`;
+
+    const dot = pill.createSpan({ cls: 'gtd-role-chip-dot' });
+    dot.style.backgroundColor = r.color;
     pill.createSpan({ cls: 'gtd-role-chip-label', text: r.label });
-    pill.addEventListener('click', () => {
-      const roles = new Set(ctx.getState().activeFilterRoles);
-      if (roles.has(r.id)) {
-        if (roles.size > 1) {
-          roles.delete(r.id);
+
+    pill.addEventListener('click', (e: MouseEvent) => {
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        // Multi-select toggle
+        const roles = new Set(ctx.getState().activeFilterRoles);
+        if (roles.has(r.id)) {
+          if (roles.size > 1) {
+            roles.delete(r.id);
+          }
+        } else {
+          roles.add(r.id);
         }
+        ctx.setState({ activeFilterRoles: roles });
       } else {
-        roles.add(r.id);
+        // Single-select (exclusive radio):
+        // If clicking the active solo pill, toggle back to All
+        const currentRoles = ctx.getState().activeFilterRoles;
+        if (currentRoles.has(r.id) && currentRoles.size === 1) {
+          ctx.setState({ activeFilterRoles: new Set(allRoleIds) });
+        } else {
+          ctx.setState({ activeFilterRoles: new Set([r.id]) });
+        }
       }
-      ctx.setState({ activeFilterRoles: roles });
     });
   }
 }

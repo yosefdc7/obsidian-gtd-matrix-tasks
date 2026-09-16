@@ -1,5 +1,5 @@
 import { Menu } from 'obsidian';
-import { getEisenhowerSection, getGTDSection } from '../parser';
+import { getEisenhowerSection, getGTDSection, parseConfiguredRoles } from '../parser';
 import { EISENHOWER_SECTIONS, GTD_SECTIONS } from './types';
 import type { ViewContext } from './types';
 import type { RoleId, SectionId, TaskItem, TaskPriority } from '../types';
@@ -126,10 +126,13 @@ export function showTaskActionMenu(e: MouseEvent, task: TaskItem, ctx: ViewConte
   });
 
   // 4. Role assignment
+  const configured = parseConfiguredRoles(ctx.settings.configuredRoleTags);
   const roles: { id: RoleId | null; label: string; icon: string }[] = [
-    { id: 'role/yo-manager', label: 'Role: Yo Manager', icon: 'briefcase' },
-    { id: 'role/josef-selfcare', label: 'Role: Josef Self-Care', icon: 'heart' },
-    { id: 'role/rj-supportive', label: 'Role: RJ Supportive', icon: 'users' },
+    ...configured.map((c) => ({
+      id: c.id,
+      label: `Role: ${c.label}`,
+      icon: c.id === 'role/yo-manager' ? 'briefcase' : c.id === 'role/josef-selfcare' ? 'heart' : c.id === 'role/rj-supportive' ? 'users' : 'tag'
+    })),
     { id: null, label: 'Role: Untagged / None', icon: 'tag' }
   ];
   for (const r of roles) {

@@ -1,5 +1,13 @@
-﻿import { describe, it, expect } from 'vitest';
-import { parseTaskLine, setTaskRole, extractRoleFromTags, extractRoleFromPath } from '../src/parser';
+import { describe, it, expect } from 'vitest';
+import {
+  parseTaskLine,
+  setTaskRole,
+  extractRoleFromTags,
+  extractRoleFromPath,
+  formatRoleLabel,
+  parseConfiguredRoles,
+  getRoleColor
+} from '../src/parser';
 
 describe('Role Tag Mutation & Extraction', () => {
   it('extracts role from inline tags', () => {
@@ -36,5 +44,35 @@ describe('Role Tag Mutation & Extraction', () => {
     const task = parseTaskLine(line, 'Jots/2026/Sep/Sep 14 2026.md', 10);
     expect(task).not.toBeNull();
     expect(task?.linkedNotes).toEqual(['GCash Strategic Planning', 'Budget 2026']);
+  });
+
+  it('formats role labels in clean Title Case', () => {
+    expect(formatRoleLabel('role/yo-manager')).toBe('Yo Manager');
+    expect(formatRoleLabel('role/josef-selfcare')).toBe('Josef Self-Care');
+    expect(formatRoleLabel('role/rj-supportive')).toBe('RJ Supportive');
+    expect(formatRoleLabel('deep-work')).toBe('Deep Work');
+    expect(formatRoleLabel('#roles/client-project')).toBe('Client Project');
+  });
+
+  it('parses configured role tags from csv string', () => {
+    const roles = parseConfiguredRoles('role/engineering, client-ops, #personal');
+    expect(roles).toHaveLength(3);
+    expect(roles[0]).toEqual({ id: 'role/engineering', label: 'Engineering', tag: 'role/engineering' });
+    expect(roles[1]).toEqual({ id: 'role/client-ops', label: 'Client Ops', tag: 'client-ops' });
+    expect(roles[2]).toEqual({ id: 'role/personal', label: 'Personal', tag: 'personal' });
+  });
+
+  it('extracts role using custom configured roles', () => {
+    const customRoles = parseConfiguredRoles('role/engineering, marketing');
+    expect(extractRoleFromTags(['#role/engineering'], customRoles)).toBe('role/engineering');
+    expect(extractRoleFromTags(['#marketing'], customRoles)).toBe('role/marketing');
+    expect(extractRoleFromPath('Roles/Engineering/Task.md', customRoles)).toBe('role/engineering');
+  });
+
+  it('generates consistent colors for roles', () => {
+    expect(getRoleColor('untagged')).toContain('var(');
+    expect(getRoleColor('role/yo-manager')).toContain('blue');
+    expect(getRoleColor('role/josef-selfcare')).toContain('green');
+    expect(getRoleColor('role/custom-a')).toBe(getRoleColor('role/custom-a'));
   });
 });

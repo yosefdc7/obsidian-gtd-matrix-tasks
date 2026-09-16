@@ -3,6 +3,7 @@ import { showCalendarPicker } from './calendar-picker';
 import { showMoveColumnMenu, showPriorityMenu, showStatusMenu, showTaskActionMenu } from './task-menus';
 import type { ViewContext } from './types';
 import type { TaskItem, TaskPriority } from '../types';
+import { formatRoleLabel, getRoleColor } from '../parser';
 
 function getPriorityLabel(prio: TaskPriority): string {
   switch (prio) {
@@ -106,15 +107,13 @@ export function renderBoardCard(container: HTMLElement, task: TaskItem, ctx: Vie
 
   // Role badge
   if (task.effectiveRole && task.effectiveRole !== 'untagged') {
+    const roleColor = getRoleColor(task.effectiveRole);
     const roleBadge = metaEl.createSpan({
       cls: `gtd-role-badge badge-${task.effectiveRole.replace('/', '-')}`,
-      text:
-        task.effectiveRole === 'role/yo-manager'
-          ? 'Yo Manager'
-          : task.effectiveRole === 'role/josef-selfcare'
-          ? 'Josef Self-Care'
-          : 'RJ Supportive'
+      text: formatRoleLabel(task.effectiveRole)
     });
+    roleBadge.style.setProperty('--role-color', roleColor);
+    roleBadge.addClass('has-custom-color');
     roleBadge.title = `Role source: ${task.roleSource}`;
   }
 
@@ -332,18 +331,17 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
 
   // Role dot chip
   if (task.effectiveRole && task.effectiveRole !== 'untagged') {
+    const roleColor = getRoleColor(task.effectiveRole);
     const roleBadge = metaEl.createSpan({
       cls: `gtd-role-badge badge-${task.effectiveRole.replace('/', '-')}`
     });
-    roleBadge.createSpan({ cls: 'gtd-role-dot' });
+    roleBadge.style.setProperty('--role-color', roleColor);
+    roleBadge.addClass('has-custom-color');
+    const dot = roleBadge.createSpan({ cls: 'gtd-role-dot' });
+    dot.style.backgroundColor = roleColor;
     roleBadge.createSpan({
       cls: 'gtd-role-label',
-      text:
-        task.effectiveRole === 'role/yo-manager'
-          ? 'Yo Manager'
-          : task.effectiveRole === 'role/josef-selfcare'
-          ? 'Josef Self-Care'
-          : 'RJ Supportive'
+      text: formatRoleLabel(task.effectiveRole)
     });
     roleBadge.title = `Role source: ${task.roleSource}`;
   }

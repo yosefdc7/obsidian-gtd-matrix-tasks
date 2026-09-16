@@ -15,6 +15,7 @@ import type {
 import type { TaskStore } from '../store/task-store';
 import type { TaskMutator } from '../store/task-mutator';
 import type { QuickFilterChip } from './task-filter';
+import { parseConfiguredRoles } from '../parser';
 
 export const VIEW_TYPE_GTD_MATRIX = 'gtd-matrix-tasks-view';
 
@@ -142,6 +143,27 @@ export const ROLE_SWIMLANES: SwimlaneDefinition[] = [
     roleTag: null
   }
 ];
+
+export function getSwimlaneDefinitions(configuredRoleTags?: string): SwimlaneDefinition[] {
+  const configured = parseConfiguredRoles(configuredRoleTags);
+  const lanes: SwimlaneDefinition[] = configured.map((c) => ({
+    id: c.id,
+    title: c.label,
+    subtitle: `Tasks categorized under ${c.label}.`,
+    icon: c.id === 'role/yo-manager' ? 'briefcase' : c.id === 'role/josef-selfcare' ? 'heart' : c.id === 'role/rj-supportive' ? 'users' : 'tag',
+    badgeClass: `badge-${c.id.replace('/', '-')}`,
+    roleTag: c.tag
+  }));
+  lanes.push({
+    id: 'untagged',
+    title: 'Other / Untagged',
+    subtitle: 'Tasks without a designated role tag or link.',
+    icon: 'help-circle',
+    badgeClass: 'badge-role-untagged',
+    roleTag: null
+  });
+  return lanes;
+}
 
 /** Compact section title used by composer chips and stream/list headers. */
 export function getSectionShortTitle(secId: SectionId, defaultTitle: string): string {

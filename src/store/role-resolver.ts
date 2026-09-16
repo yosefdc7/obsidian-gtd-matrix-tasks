@@ -1,6 +1,6 @@
 import { App, TFile } from 'obsidian';
-import { TaskItem, RoleId } from '../types';
-import { extractRoleFromTags, extractRoleFromPath } from '../parser';
+import { TaskItem, RoleId, ConfiguredRole } from '../types';
+import { extractRoleFromTags, extractRoleFromPath, DEFAULT_ROLE_DEFS } from '../parser';
 
 export interface ResolvedRole {
   role: RoleId;
@@ -8,11 +8,25 @@ export interface ResolvedRole {
 }
 
 export class RoleResolver {
-  constructor(private app: App) {}
+  private configuredRoles: ConfiguredRole[] = DEFAULT_ROLE_DEFS;
+
+  constructor(private app: App, configuredRoles?: ConfiguredRole[]) {
+    if (configuredRoles && configuredRoles.length > 0) {
+      this.configuredRoles = configuredRoles;
+    }
+  }
+
+  public setConfiguredRoles(roles: ConfiguredRole[]): void {
+    this.configuredRoles = roles;
+  }
+
+  public getConfiguredRoles(): ConfiguredRole[] {
+    return this.configuredRoles;
+  }
 
   public resolveTaskRole(task: TaskItem): ResolvedRole {
     // 1. Inline tag on task
-    const inlineRole = extractRoleFromTags(task.tags);
+    const inlineRole = extractRoleFromTags(task.tags, this.configuredRoles);
     if (inlineRole) {
       return { role: inlineRole, source: 'inline' };
     }
@@ -22,7 +36,7 @@ export class RoleResolver {
       for (const link of task.linkedNotes) {
         const targetFile = this.app.metadataCache.getFirstLinkpathDest(link, task.filePath);
         if (targetFile) {
-          const pathRole = extractRoleFromPath(targetFile.path);
+          const pathRole = extractRoleFromPath(targetFile.path, this.configuredRoles);
           if (pathRole) {
             return { role: pathRole, source: 'linked-note' };
           }
@@ -33,7 +47,7 @@ export class RoleResolver {
             : typeof frontTags === 'string'
             ? frontTags.split(',').map((s) => s.trim())
             : [];
-          const tagRole = extractRoleFromTags(tagsList);
+          const tagRole = extractRoleFromTags(tagsList, this.configuredRoles);
           if (tagRole) {
             return { role: tagRole, source: 'linked-note' };
           }
@@ -42,7 +56,7 @@ export class RoleResolver {
     }
 
     // 3. Parent note role (path or frontmatter)
-    const parentPathRole = extractRoleFromPath(task.filePath);
+    const parentPathRole = extractRoleFromPath(task.filePath, this.configuredRoles);
     if (parentPathRole) {
       return { role: parentPathRole, source: 'parent-note' };
     }
@@ -55,7 +69,7 @@ export class RoleResolver {
         : typeof frontTags === 'string'
         ? frontTags.split(',').map((s) => s.trim())
         : [];
-      const parentTagRole = extractRoleFromTags(tagsList);
+      const parentTagRole = extractRoleFromTags(tagsList, this.configuredRoles);
       if (parentTagRole) {
         return { role: parentTagRole, source: 'parent-note' };
       }

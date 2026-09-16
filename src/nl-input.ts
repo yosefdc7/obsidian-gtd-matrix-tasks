@@ -75,15 +75,21 @@ export function parseNaturalLanguageInput(text: string, todayStr: string): Parse
     role = HASH_ROLE_MAP[roleMatch[1].toLowerCase()] ?? null;
     rest = rest.replace(roleMatch[0], ' ');
   } else {
-    const phraseMatch = rest.match(ROLE_PHRASE_REGEX);
-    if (phraseMatch) {
-      const phrase = phraseMatch[1].toLowerCase();
-      role = phrase.startsWith('yo')
-        ? 'role/yo-manager'
-        : phrase.startsWith('josef')
-          ? 'role/josef-selfcare'
-          : 'role/rj-supportive';
-      rest = rest.replace(phraseMatch[0], ' ');
+    const genericRoleMatch = rest.match(/#role\/([a-zA-Z0-9_-]+)(?![-\w])/i);
+    if (genericRoleMatch) {
+      role = `role/${genericRoleMatch[1].toLowerCase()}`;
+      rest = rest.replace(genericRoleMatch[0], ' ');
+    } else {
+      const phraseMatch = rest.match(ROLE_PHRASE_REGEX);
+      if (phraseMatch) {
+        const phrase = phraseMatch[1].toLowerCase();
+        role = phrase.startsWith('yo')
+          ? 'role/yo-manager'
+          : phrase.startsWith('josef')
+            ? 'role/josef-selfcare'
+            : 'role/rj-supportive';
+        rest = rest.replace(phraseMatch[0], ' ');
+      }
     }
   }
 

@@ -8,11 +8,13 @@ export type TagViewMode = 'filter' | 'swimlanes';
 /** Date field that positions a task in the By Date view. */
 export type DateAnchorField = 'start' | 'scheduled' | 'due';
 
-export type RoleId =
-  | 'role/yo-manager'
-  | 'role/josef-selfcare'
-  | 'role/rj-supportive'
-  | 'untagged';
+export type RoleId = string;
+
+export interface ConfiguredRole {
+  id: RoleId;
+  label: string;
+  tag: string;
+}
 
 export interface SwimlaneDefinition {
   id: RoleId;
@@ -83,6 +85,7 @@ export interface PluginSettings {
   defaultLayoutMode: LayoutMode;
   defaultSortCriteria: SortCriteria;
   defaultTagViewMode: TagViewMode;
+  configuredRoleTags: string;
   activeFilterRoles: string[];
   autoInitializeNoteProperties: boolean;
   autoMoveNotes: boolean;
@@ -105,6 +108,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   defaultLayoutMode: 'board',
   defaultSortCriteria: 'date',
   defaultTagViewMode: 'filter',
+  configuredRoleTags: 'role/yo-manager, role/josef-selfcare, role/rj-supportive',
   activeFilterRoles: [
     'role/yo-manager',
     'role/josef-selfcare',

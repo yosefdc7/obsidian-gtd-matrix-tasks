@@ -4,10 +4,22 @@
 Port the approved **Stream UI** direction into the plugin on the ADR 0005 modular renderers (ADR 0008): the List layout becomes the Stream list, shared chrome (header, NL quick-add, role chips, every add-composer, quick-capture modal) gets the Stream treatment, and secondary toolbar controls move behind an options disclosure. The Board keeps its kanban structure (drag-drop, swimlanes, mobile carousel untouched). Source design: `2nd Brain/prototypes/gtd-ui/refined-stream.html` (untouched).
 
 ## Status
-Minimalist month date calendar picker popover delivered and committed (`66bcdf4 [antigravity] feat: add minimalist month date calendar picker popover`). Stream UI delivery complete (ADR 0008). Live-verified against `2nd brain v7` (185/185 tests, `tsc --noEmit` clean, DOM inspection verified).
+Delivered and committed configurable role tags setting, "All" pill filter, and exclusive radio-style role filtering with multi-select modifiers (`[antigravity] feat: add 'All' pill, exclusive radio filter, and settings-configurable role tags`). Live-verified against `2nd brain v7` (189/189 tests, `tsc --noEmit` clean, DOM inspection and CDP click tests verified).
 
 ## Completed
-- `src/view/calendar-picker.ts` (new): Minimalist month grid date calendar picker popover (`showCalendarPicker`).
+- Role Filter Pills & Filtering:
+  - Added "All" pill to role filter chips row (`All`, then configured roles, then `Untagged`).
+  - Exclusive radio-style filtering: clicking a pill (e.g. `Untagged`) activates *only* that pill and shows only tasks for that role.
+  - Clicking the same active solo pill again reverts back to "All" (all pills active).
+  - Modifier multi-select: holding `Shift` or `Ctrl`/`Cmd` allows toggling multiple specific roles simultaneously.
+  - Filtering dynamically applies to Swimlanes mode (soloing a role shows only that role's swimlane).
+- Configurable Role Tags Setting:
+  - Added "Role tags" text setting in plugin settings tab (`PluginSettings.configuredRoleTags`, default `'role/yo-manager, role/josef-selfcare, role/rj-supportive'`).
+  - Clean Title Case label derivation (`role/yo-manager` -> "Yo Manager", with custom title casing for user aliases).
+  - Deterministic rotating color palette (blue, emerald, purple, amber, cyan, rose).
+  - Unified tag & folder matching for task role resolution.
+  - Context menu for role assignment dynamically populates from configured role definitions.
+- `src/view/calendar-picker.ts`: Minimalist month grid date calendar picker popover (`showCalendarPicker`).
   - Monday-first 7-column calendar grid with `<` and `>` month navigation.
   - Formats ISO `YYYY-MM-DD`, detects today (`is-today`) and selected date (`is-selected`).
   - 1-click select immediately calls `onSelect` and mutates date on task.

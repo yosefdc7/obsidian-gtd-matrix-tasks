@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type GTDMatrixPlugin from './main';
 import { ViewMode, LayoutMode, SortCriteria, TagViewMode } from './types';
+import { parseConfiguredRoles } from './parser';
 
 export class GTDMatrixSettingTab extends PluginSettingTab {
   plugin: GTDMatrixPlugin;
@@ -72,6 +73,23 @@ export class GTDMatrixSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.defaultTagViewMode = value as TagViewMode;
             await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName('Role tags')
+      .setDesc('Comma-separated list of role tags used for filtering, swimlanes, and pills (e.g., "role/yo-manager, role/josef-selfcare, role/rj-supportive"). Labels are automatically formatted in Title Case.')
+      .addText((text) => {
+        text
+          .setPlaceholder('role/yo-manager, role/josef-selfcare, role/rj-supportive')
+          .setValue(this.plugin.settings.configuredRoleTags || '')
+          .onChange(async (value) => {
+            this.plugin.settings.configuredRoleTags = value;
+            const parsed = parseConfiguredRoles(value);
+            this.plugin.settings.activeFilterRoles = [...parsed.map((r) => r.id), 'untagged'];
+            await this.plugin.saveSettings();
+            this.plugin.scanner.updateSettings(this.plugin.settings);
+            await this.plugin.scanner.scanVault();
           });
       });
 

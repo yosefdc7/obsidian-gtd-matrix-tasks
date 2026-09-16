@@ -4,7 +4,7 @@ import { renderTaskItem } from './card-renderer';
 import { renderDateQuickAddRow, renderQuickAddRow } from './composer';
 import { DATE_BUCKET_COMPLETED } from './date-buckets';
 import type { DateBucketDefinition } from './date-buckets';
-import { getSectionShortTitle, ROLE_SWIMLANES } from './types';
+import { getSectionShortTitle, getSwimlaneDefinitions } from './types';
 import type { ViewContext } from './types';
 import type { RoleId, SectionDefinition, SectionId, TaskItem } from '../types';
 
@@ -108,7 +108,7 @@ export function renderSwimlaneList(
   const state = ctx.getState();
   const wrapper = container.createDiv({ cls: 'gtd-swimlanes-list-wrapper' });
 
-  for (const lane of ROLE_SWIMLANES) {
+  for (const lane of getSwimlaneDefinitions(ctx.settings.configuredRoleTags)) {
     if (!state.activeFilterRoles.has(lane.id)) continue;
 
     const laneTasks = tasks.filter((t) => t.effectiveRole === lane.id);

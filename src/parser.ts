@@ -1,4 +1,4 @@
-import { TaskItem, TaskPriority, GTDSectionId, EisenhowerSectionId, RoleId, SortCriteria } from './types';
+import { TaskItem, TaskPriority, GTDSectionId, EisenhowerSectionId, RoleId, SortCriteria, ConfiguredRole } from './types';
 
 const TASK_REGEX = /^(\s*[-*+]\s*\[)(.)(\]\s*)(.*)$/;
 const DUE_DATE_REGEX = /📅\s*(\d{4}-\d{2}-\d{2})/;
@@ -325,34 +325,127 @@ export function getEisenhowerSection(task: TaskItem, todayStr: string): Eisenhow
   return 'eisen-inbox';
 }
 
+export function formatRoleLabel(tag: string): string {
+  let clean = tag.replace(/^#+/, '').trim();
+  clean = clean.replace(/^(roles?\/)/i, '');
+  const lower = clean.toLowerCase();
+  if (
+    lower === 'josef-selfcare' ||
+    lower === 'josef-self-care' ||
+    lower === 'josefselfcare'
+  ) {
+    return 'Josef Self-Care';
+  }
+  if (lower === 'rj-supportive' || lower === 'rjsupportive') {
+    return 'RJ Supportive';
+  }
+  clean = clean.replace(/[-_/]+/g, ' ').trim();
+  return clean
+    .split(/\s+/)
+    .map((word) => {
+      if (word.toLowerCase() === 'rj') return 'RJ';
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
+export const DEFAULT_ROLE_DEFS: ConfiguredRole[] = [
+  { id: 'role/yo-manager', label: 'Yo Manager', tag: 'role/yo-manager' },
+  { id: 'role/josef-selfcare', label: 'Josef Self-Care', tag: 'role/josef-selfcare' },
+  { id: 'role/rj-supportive', label: 'RJ Supportive', tag: 'role/rj-supportive' }
+];
+
+export function parseConfiguredRoles(csv?: string): ConfiguredRole[] {
+  if (!csv || !csv.trim()) {
+    return DEFAULT_ROLE_DEFS;
+  }
+  const parts = csv
+    .split(',')
+    .map((s) => s.trim().replace(/^#+/, '').trim())
+    .filter(Boolean);
+  if (parts.length === 0) {
+    return DEFAULT_ROLE_DEFS;
+  }
+  return parts.map((rawTag) => {
+    const norm = rawTag.toLowerCase();
+    const id = norm.startsWith('role/') ? norm : `role/${norm}`;
+    return {
+      id,
+      label: formatRoleLabel(rawTag),
+      tag: norm
+    };
+  });
+}
+
+export const ROLE_COLOR_PALETTE = [
+  'var(--color-blue, #3b82f6)',
+  'var(--color-green, #10b981)',
+  'var(--color-purple, #8b5cf6)',
+  'var(--color-orange, #f59e0b)',
+  'var(--color-cyan, #06b6d4)',
+  'var(--color-red, #ef4444)',
+  'var(--color-pink, #ec4899)',
+  'var(--color-yellow, #eab308)'
+];
+
+export function getRoleColor(roleId: string, index?: number): string {
+  if (roleId === 'untagged') return 'var(--text-faint, #94a3b8)';
+  if (roleId === 'role/yo-manager') return 'var(--color-blue, #3b82f6)';
+  if (roleId === 'role/josef-selfcare') return 'var(--color-green, #10b981)';
+  if (roleId === 'role/rj-supportive') return 'var(--color-purple, #8b5cf6)';
+  if (typeof index === 'number' && index >= 0) {
+    return ROLE_COLOR_PALETTE[index % ROLE_COLOR_PALETTE.length];
+  }
+  let hash = 0;
+  for (let i = 0; i < roleId.length; i++) {
+    hash = (hash << 5) - hash + roleId.charCodeAt(i);
+    hash |= 0;
+  }
+  return ROLE_COLOR_PALETTE[Math.abs(hash) % ROLE_COLOR_PALETTE.length];
+}
+
 export const ROLE_IDS: RoleId[] = [
   'role/yo-manager',
   'role/josef-selfcare',
   'role/rj-supportive'
 ];
 
-export function extractRoleFromTags(tags: string[]): RoleId | null {
+export function extractRoleFromTags(tags: string[], configuredRoles?: ConfiguredRole[]): RoleId | null {
+  const roles = configuredRoles && configuredRoles.length > 0 ? configuredRoles : DEFAULT_ROLE_DEFS;
   for (const tag of tags) {
     const cleanTag = tag.replace(/^#/, '').toLowerCase().trim();
-    if (cleanTag === 'role/yo-manager' || cleanTag === 'yo-manager') return 'role/yo-manager';
-    if (
-      cleanTag === 'role/josef-selfcare' ||
-      cleanTag === 'josef-selfcare' ||
-      cleanTag === 'role/josef-self-care' ||
-      cleanTag === 'josef-self-care'
-    ) {
-      return 'role/josef-selfcare';
+    for (const r of roles) {
+      if (cleanTag === r.id || cleanTag === r.tag) return r.id;
+      if (r.id.startsWith('role/') && cleanTag === r.id.slice(5)) return r.id;
+      if (!cleanTag.startsWith('role/') && `role/${cleanTag}` === r.id) return r.id;
+      const hypLabel = r.label.toLowerCase().replace(/\s+/g, '-');
+      if (cleanTag === hypLabel || cleanTag === `role/${hypLabel}`) return r.id;
+      if (r.id === 'role/josef-selfcare') {
+        if (
+          cleanTag === 'role/josef-selfcare' ||
+          cleanTag === 'josef-selfcare' ||
+          cleanTag === 'role/josef-self-care' ||
+          cleanTag === 'josef-self-care'
+        ) {
+          return 'role/josef-selfcare';
+        }
+      }
     }
-    if (cleanTag === 'role/rj-supportive' || cleanTag === 'rj-supportive') return 'role/rj-supportive';
   }
   return null;
 }
 
-export function extractRoleFromPath(filePath: string): RoleId | null {
+export function extractRoleFromPath(filePath: string, configuredRoles?: ConfiguredRole[]): RoleId | null {
   const norm = filePath.replace(/\\/g, '/');
-  if (norm.startsWith('Roles/Yo Manager/') || norm.includes('/Yo Manager/')) return 'role/yo-manager';
-  if (norm.startsWith('Roles/Josef Self-Care/') || norm.includes('/Josef Self-Care/')) return 'role/josef-selfcare';
-  if (norm.startsWith('Roles/RJ Supportive/') || norm.includes('/RJ Supportive/')) return 'role/rj-supportive';
+  const roles = configuredRoles && configuredRoles.length > 0 ? configuredRoles : DEFAULT_ROLE_DEFS;
+  for (const r of roles) {
+    if (norm.startsWith(`Roles/${r.label}/`) || norm.includes(`/${r.label}/`)) return r.id;
+    if (r.tag.startsWith('role/')) {
+      const raw = r.tag.slice(5);
+      if (norm.includes(`/${raw}/`)) return r.id;
+    }
+    if (norm.includes(`/${r.tag}/`)) return r.id;
+  }
   return null;
 }
 

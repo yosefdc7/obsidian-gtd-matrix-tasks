@@ -1367,6 +1367,39 @@
   border-color: var(--text-muted);
 }
 
+/* "All" Pill Styling */
+.gtd-role-chip-btn.gtd-role-chip-all {
+  font-weight: 700;
+  padding: 4px 12px;
+}
+
+.gtd-role-chip-btn.gtd-role-chip-all.is-active {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--text-muted);
+}
+
+/* Custom Dynamic Role Color Styling */
+.gtd-role-chip-btn.has-custom-color .gtd-role-chip-dot {
+  background: var(--role-color, var(--text-faint));
+}
+
+.gtd-role-chip-btn.has-custom-color.is-active {
+  background: color-mix(in srgb, var(--role-color, var(--interactive-accent)) 18%, transparent);
+  color: var(--role-color, var(--text-normal));
+  border-color: var(--role-color, var(--interactive-accent));
+}
+
+.gtd-role-badge.has-custom-color {
+  background: color-mix(in srgb, var(--role-color, var(--interactive-accent)) 14%, transparent);
+  color: var(--role-color, var(--text-normal));
+  border: 1px solid color-mix(in srgb, var(--role-color, var(--interactive-accent)) 30%, transparent);
+}
+
+.gtd-role-badge.has-custom-color .gtd-role-dot {
+  background: var(--role-color, currentColor);
+}
+
 /* Role chips on task rows (dot + label) */
 .gtd-role-badge {
   font-size: 0.72em;
