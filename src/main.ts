@@ -128,6 +128,7 @@ export default class GTDMatrixPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.vault.on('create', async (file) => {
+        if (!this.app.workspace.layoutReady) return;
         debouncedReindex(file);
         if (file instanceof TFile && file.extension === 'md') {
           await this.ensureNoteProperties(file, false);
