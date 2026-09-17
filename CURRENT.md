@@ -4,9 +4,16 @@
 Port the approved **Stream UI** direction into the plugin on the ADR 0005 modular renderers (ADR 0008): the List layout becomes the Stream list, shared chrome (header, NL quick-add, role chips, every add-composer, quick-capture modal) gets the Stream treatment, and secondary toolbar controls move behind an options disclosure. The Board keeps its kanban structure (drag-drop, swimlanes, mobile carousel untouched). Source design: `2nd Brain/prototypes/gtd-ui/refined-stream.html` (untouched).
 
 ## Status
-Delivered snapshot cache persistence (`.obsidian/plugins/gtd-matrix-tasks/task-cache.json`) and metadata-gated scanning in `obsidian-gtd-matrix-tasks` (`122e0ac [antigravity] feat: add snapshot cache persistence and metadata-gated scan for instant view loading`). All 210 unit tests passing (`210/210`), TypeScript compilation clean (`tsc --noEmit` exit 0), bundle built and deployed to `2nd brain v7`.
+Converted Quick Capture modal into top-docked sheet (`21558a6 [antigravity] fix: convert quick capture modal into top-docked sheet to prevent mobile keyboard overlap`). All 214 unit tests passing (`214/214`), TypeScript compilation clean (`tsc --noEmit` exit 0), bundle built and deployed to `2nd brain v7`, verified zero errors in Obsidian.
 
 ## Completed
+- Quick Capture Top Sheet (`src/view/quick-capture-modal.ts`, `styles.css`):
+  - Fixed mobile keyboard overlap by anchoring the Quick Capture sheet to the top of the viewport (`align-items: flex-start`).
+  - Added slide-down animation (`@keyframes gtdSlideDown`, `translateY(-100%)` -> `translateY(0)`).
+  - Styled with rounded bottom corners (`border-radius: 0 0 16px 16px`), top-docked border (`border-top: none`), and status bar safe area clearance (`padding: calc(14px + env(safe-area-inset-top, 0px)) 18px 16px`).
+  - Added `enterkeyhint: 'send'` to the input field so tapping the mobile keyboard's blue action/enter key immediately captures the task.
+  - Added compact spacing (`gap: 10px`, tightened option row and button padding) and `max-height: calc(100vh - 24px); overflow-y: auto;` safety fallback.
+  - Committed with conventional tag `21558a6`.
 - Snapshot Cache Persistence & Metadata-Gated Scanning (`src/store/task-store.ts`, `src/store/scan-engine.ts`, `src/vault-scanner.ts`, `src/view/view.ts`, `src/main.ts`, `tests/task-store-snapshot.test.ts`):
   - Added persistent snapshot adapter to `TaskStore` targeting `.obsidian/plugins/gtd-matrix-tasks/task-cache.json`.
   - Implemented `loadSnapshot` to hydrate tasks instantly (~2ms) into `this.tasks` on plugin startup and view open.
@@ -74,10 +81,9 @@ Delivered snapshot cache persistence (`.obsidian/plugins/gtd-matrix-tasks/task-c
 - `dev:errors` clean after every interaction. Screenshots: `%TEMP%\gtd-stream-verify\` (stream + board mobile, desktop final).
 - Note: after `plugin:reload` or a mobile-emulation reload, stale leaves lose `contentEl`; detach them (`getLeavesOfType('gtd-matrix-tasks-view')`) and call `plugin.activateView()` before DOM checks.
 
-## Changed Files (committed `1703010`)
-- New: `src/nl-input.ts`, `src/view/composer.ts`, `tests/nl-input.test.ts` (+ `tests/task-mutator.test.ts` extensions)
-- Modified: `src/store/task-mutator.ts`, `src/view/` (types, view, toolbar-renderer, card-renderer, list-renderer, board-renderer, task-menus, quick-capture-modal), `styles.css`
+## Changed Files (committed `21558a6`)
+- Modified: `src/view/quick-capture-modal.ts`, `styles.css`
 
 ## Next
-1. User visual pass on a real mobile device — Stream rows, chips, FAB/modal flow.
+1. User verification on mobile device — test opening Quick Capture via FAB, confirming sheet drops down from top and remains fully accessible above the virtual keyboard.
 2. (Deferred, optional) "new row flash" animation from the prototype.
