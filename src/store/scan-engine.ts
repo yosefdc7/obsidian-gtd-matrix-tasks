@@ -1,4 +1,5 @@
-import { App, TFile, debounce } from 'obsidian';
+import { App, TFile, debounce, Platform } from 'obsidian';
+import { yieldCooperative } from '../utils/yield';
 import { TaskItem, PluginSettings } from '../types';
 import { parseTaskLine } from '../parser';
 import { TaskStore } from './task-store';
@@ -42,7 +43,7 @@ export class ScanEngine {
         const files = this.app.vault.getMarkdownFiles().filter((f) => !this.isExcluded(f.path));
 
         const allTasks: TaskItem[] = [];
-        const CHUNK_SIZE = 50;
+        const CHUNK_SIZE = Platform.isMobile ? 15 : 50;
 
         for (let i = 0; i < files.length; i += CHUNK_SIZE) {
           const chunk = files.slice(i, i + CHUNK_SIZE);
@@ -89,6 +90,10 @@ export class ScanEngine {
               }
             })
           );
+
+          if (Platform.isMobile && i + CHUNK_SIZE < files.length) {
+            await yieldCooperative();
+          }
         }
 
         this.store.setTasks(allTasks);
