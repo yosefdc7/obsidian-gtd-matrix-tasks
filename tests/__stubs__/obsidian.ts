@@ -28,3 +28,13 @@ export function debounce<A extends unknown[], R>(
   };
   return wrapped;
 }
+
+export const Platform = {
+  isMobile: false,
+  isDesktop: true,
+  isIosApp: false,
+  isAndroidApp: false,
+  isMacOS: false,
+  isWin: true,
+  isLinux: false,
+};
