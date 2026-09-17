@@ -200,7 +200,7 @@
   gap: 8px;
 }
 
-/* Single tab row: view tabs + anchor tabs + ⚙ toggle on one line */
+/* Single tab row: view tabs + anchor tabs + action buttons on one line */
 .gtd-tab-row {
   display: flex;
   align-items: center;
@@ -208,30 +208,49 @@
   flex-wrap: wrap;
 }
 
-/* Push the options toggle to the far right */
-.gtd-tab-row > .gtd-options {
+.gtd-tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-left: auto;
 }
 
-/* Mobile: tabs stretch full width, anchor + toggle wrap to next line */
-@media (max-width: 540px) {
-  .gtd-tab-row {
-    row-gap: 6px;
-  }
+.gtd-mode-label-short {
+  display: none;
+}
+.gtd-mode-label-full {
+  display: inline;
+}
 
-  .gtd-tab-row > .gtd-mode-switcher:first-child {
-    flex: 1 1 100%;
-    display: flex;
-  }
+.gtd-search-toggle-btn {
+  display: none; /* hidden on desktop */
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
 
-  .gtd-tab-row > .gtd-mode-switcher:first-child .gtd-mode-btn {
-    flex: 1;
-    text-align: center;
-  }
+.gtd-search-toggle-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
 
-  .gtd-tab-row > .gtd-options {
-    margin-left: auto;
-  }
+.gtd-search-toggle-btn.is-active {
+  color: var(--text-accent);
+  border-color: var(--interactive-accent);
+  background-color: rgba(var(--interactive-accent-rgb), 0.1);
+}
+
+.gtd-search-toggle-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .gtd-options-toggle {
@@ -240,6 +259,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
+  padding: 0 !important;
   border-radius: 8px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
@@ -264,6 +284,62 @@
   height: 16px;
 }
 
+/* Expandable mobile search row */
+.gtd-mobile-search-row {
+  display: none;
+  width: 100%;
+}
+
+.gtd-mobile-search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background-color: var(--background-secondary);
+  transition: border-color 0.15s;
+}
+
+.gtd-mobile-search-wrapper:focus-within {
+  border-color: var(--interactive-accent);
+}
+
+.gtd-mobile-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 16px;
+}
+
+.gtd-mobile-search-input:focus {
+  outline: none;
+}
+
+.gtd-search-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.gtd-search-clear-btn:hover {
+  color: var(--text-normal);
+}
+
+.gtd-search-clear-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .gtd-options-row {
   display: flex;
   flex-wrap: wrap;
@@ -280,69 +356,7 @@
   display: none !important;
 }
 
-/* Natural-language quick-add bar */
-.gtd-nl-bar {
-  display: flex;
-  flex-direction: column;
-}
-
-.gtd-nl-bar-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 5px 4px 12px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 10px;
-  background: var(--background-secondary);
-  transition: border-color 0.15s;
-}
-
-.gtd-nl-bar-row:focus-within {
-  border-color: var(--interactive-accent);
-}
-
-.gtd-nl-bar-icon {
-  display: flex;
-  align-items: center;
-  color: var(--text-faint);
-}
-
-.gtd-nl-bar-icon svg {
-  width: 15px;
-  height: 15px;
-}
-
-.gtd-nl-bar-input {
-  flex: 1;
-  min-width: 0;
-  padding: 7px 0;
-  border: none;
-  background: transparent;
-  color: var(--text-normal);
-  font-size: 0.9em;
-}
-
-.gtd-nl-bar-input:focus {
-  outline: none;
-}
-
-.gtd-nl-bar-add {
-  padding: 6px 14px;
-  border-radius: 8px;
-  border: none;
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  font-weight: 600;
-  font-size: 0.82em;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.gtd-nl-bar-add:hover {
-  opacity: 0.9;
-}
-
-/* Parse-preview chips (quick-add bar, composers, modal) */
+/* Parse-preview chips (composers, modal) */
 .gtd-nl-chips {
   display: flex;
   flex-wrap: wrap;
@@ -1903,37 +1917,89 @@
     padding: 6px 12px;
   }
 
-  .gtd-layout-btn {
+  /* Hide desktop brand header and stats on mobile */
+  .gtd-stream-head {
+    display: none !important;
+  }
+
+  /* Responsive mode label abbreviation */
+  .gtd-mode-label-full {
+    display: none !important;
+  }
+  .gtd-mode-label-short {
+    display: inline !important;
+  }
+
+  /* Compact tab row */
+  .gtd-tab-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .gtd-tab-row > .gtd-mode-switcher:first-child {
+    flex: 1 1 auto;
+    display: flex;
+  }
+
+  .gtd-tab-row > .gtd-mode-switcher:first-child .gtd-mode-btn {
+    flex: 1;
+    text-align: center;
+    padding: 6px 8px;
+    min-height: 36px;
+    font-size: 0.82em;
+  }
+
+  .gtd-tab-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .gtd-search-toggle-btn {
+    display: inline-flex;
     width: 36px;
     height: 36px;
-  }
-
-  .gtd-search-wrapper {
-    min-width: 100%;
-    order: 10;
-  }
-
-  .gtd-matrix-view input.gtd-search-input {
-    min-height: 40px;
-    font-size: 16px;
-  }
-
-  .gtd-matrix-view input.gtd-nl-bar-input {
-    min-height: 40px;
-    font-size: 16px;
-  }
-
-  .gtd-matrix-view input.gtd-quick-add-input {
-    font-size: 16px;
-  }
-
-  body input.gtd-modal-input {
-    font-size: 16px;
+    padding: 0 !important;
   }
 
   .gtd-options-toggle {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
+    padding: 0 !important;
+  }
+
+  /* By Date anchor switcher as compact sub-row on mobile */
+  .gtd-anchor-switcher {
+    width: 100%;
+    order: 4;
+    margin-top: 4px;
+    display: flex;
+  }
+
+  .gtd-anchor-switcher .gtd-mode-btn {
+    flex: 1;
+    text-align: center;
+    padding: 5px 8px;
+    min-height: 32px;
+    font-size: 0.8em;
+  }
+
+  /* Expandable mobile search row */
+  .gtd-mobile-search-row:not(.is-hidden) {
+    display: flex;
+    width: 100%;
+    margin-top: 2px;
+  }
+
+  .gtd-mobile-search-wrapper {
+    height: 38px;
+  }
+
+  .gtd-mobile-search-input {
+    font-size: 16px;
   }
 
   .gtd-row-check {

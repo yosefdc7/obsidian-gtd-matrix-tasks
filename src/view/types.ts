@@ -200,6 +200,8 @@ export interface ViewState {
   collapsedSections: Set<SectionId>;
   /** Options disclosure (sort/folder/chips); session-only, default false. */
   optionsOpen: boolean;
+  /** Expandable mobile search bar toggle; session-only, default false. */
+  mobileSearchOpen?: boolean;
 }
 
 /**

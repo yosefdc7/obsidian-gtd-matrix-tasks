@@ -1,11 +1,7 @@
 import { setIcon } from 'obsidian';
-import { parseNaturalLanguageInput, previewDestinationLabel } from '../nl-input';
 import { parseConfiguredRoles, getRoleColor } from '../parser';
-import { renderParseChips } from './composer';
 import type { ViewContext } from './types';
 import type { DateAnchorField, RoleId, SortCriteria, TaskItem } from '../types';
-
-const NL_PLACEHOLDER = 'Add task — try “Pay internet bill tomorrow p1 #rj”';
 
 function getUniqueFolders(tasks: TaskItem[]): string[] {
   const set = new Set<string>();
@@ -68,9 +64,10 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
   // Segmented view tabs
   const modeGroup = tabRow.createDiv({ cls: 'gtd-mode-switcher' });
   const gtdBtn = modeGroup.createEl('button', {
-    cls: `gtd-mode-btn ${state.viewMode === 'gtd' ? 'is-active' : ''}`,
-    text: 'GTD Workflow'
+    cls: `gtd-mode-btn ${state.viewMode === 'gtd' ? 'is-active' : ''}`
   });
+  gtdBtn.createSpan({ cls: 'gtd-mode-label-full', text: 'GTD Workflow' });
+  gtdBtn.createSpan({ cls: 'gtd-mode-label-short', text: 'GTD' });
   gtdBtn.addEventListener('click', () => {
     if (state.viewMode !== 'gtd') {
       ctx.setState({ viewMode: 'gtd' });
@@ -120,9 +117,31 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
     }
   }
 
-  // Options disclosure toggle — pushed to far right of the tab row
-  const optionsWrap = tabRow.createDiv({ cls: 'gtd-options' });
-  const optionsToggle = optionsWrap.createEl('button', {
+  // Action buttons: [🔍 Search toggle (mobile)] [⚙ Options toggle]
+  const actionsWrap = tabRow.createDiv({ cls: 'gtd-tab-actions' });
+
+  // Mobile search toggle button
+  const isSearchActive = Boolean(state.mobileSearchOpen || state.searchQuery);
+  const searchToggle = actionsWrap.createEl('button', {
+    cls: `gtd-search-toggle-btn ${isSearchActive ? 'is-active' : ''}`,
+    attr: { 'aria-label': 'Search tasks' }
+  });
+  setIcon(searchToggle, 'search');
+  searchToggle.title = 'Search tasks';
+  searchToggle.addEventListener('click', () => {
+    const current = ctx.getState();
+    if (current.mobileSearchOpen || current.searchQuery) {
+      ctx.setState({ mobileSearchOpen: false, searchQuery: '' });
+    } else {
+      ctx.setState({ mobileSearchOpen: true });
+      requestAnimationFrame(() => {
+        container.querySelector<HTMLInputElement>('.gtd-mobile-search-input')?.focus();
+      });
+    }
+  });
+
+  // Options disclosure toggle
+  const optionsToggle = actionsWrap.createEl('button', {
     cls: `gtd-options-toggle ${state.optionsOpen ? 'is-active' : ''}`,
     attr: { 'aria-label': 'More options' }
   });
@@ -132,9 +151,49 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
     ctx.setState({ optionsOpen: !ctx.getState().optionsOpen });
   });
 
+  // Expandable mobile search row
+  const mobileSearchRow = toolbar.createDiv({
+    cls: `gtd-mobile-search-row ${isSearchActive ? '' : 'is-hidden'}`
+  });
+  const mSearchWrapper = mobileSearchRow.createDiv({ cls: 'gtd-mobile-search-wrapper' });
+  const mSearchIcon = mSearchWrapper.createSpan({ cls: 'gtd-search-icon' });
+  setIcon(mSearchIcon, 'search');
+  const mSearchInput = mSearchWrapper.createEl('input', {
+    type: 'text',
+    cls: 'gtd-mobile-search-input',
+    placeholder: 'Search tasks...',
+    attr: { 'aria-label': 'Search tasks' }
+  });
+  mSearchInput.value = state.searchQuery;
+  mSearchInput.addEventListener('input', () => {
+    const hadFocus = document.activeElement === mSearchInput;
+    ctx.setState({ searchQuery: mSearchInput.value });
+    if (hadFocus) {
+      requestAnimationFrame(() => {
+        const el = container.querySelector<HTMLInputElement>('.gtd-mobile-search-input');
+        if (el && document.activeElement !== el) {
+          el.focus();
+          el.setSelectionRange(el.value.length, el.value.length);
+        }
+      });
+    }
+  });
+  if (state.searchQuery) {
+    const clearBtn = mSearchWrapper.createEl('button', {
+      cls: 'gtd-search-clear-btn',
+      attr: { 'aria-label': 'Clear search' }
+    });
+    setIcon(clearBtn, 'x');
+    clearBtn.addEventListener('click', () => {
+      ctx.setState({ searchQuery: '' });
+      requestAnimationFrame(() => {
+        container.querySelector<HTMLInputElement>('.gtd-mobile-search-input')?.focus();
+      });
+    });
+  }
+
   const optionsRow = toolbar.createDiv({
     cls: `gtd-options-row ${state.optionsOpen ? '' : 'is-hidden'}`
-
   });
 
   // Layout Toggle (Board / List) — persists into settings.defaultLayoutMode
@@ -252,59 +311,6 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
     setIcon(refreshBtn, 'loader');
     await ctx.rescan();
   });
-
-  // Natural-language quick-add bar
-  const nlBar = toolbar.createDiv({ cls: 'gtd-nl-bar' });
-  const nlRow = nlBar.createDiv({ cls: 'gtd-nl-bar-row' });
-  const nlIcon = nlRow.createSpan({ cls: 'gtd-nl-bar-icon' });
-  setIcon(nlIcon, 'plus');
-  const nlInput = nlRow.createEl('input', {
-    type: 'text',
-    cls: 'gtd-nl-bar-input',
-    placeholder: NL_PLACEHOLDER,
-    attr: { 'aria-label': 'Quick add task' }
-  });
-  const nlAdd = nlRow.createEl('button', { cls: 'gtd-nl-bar-add', text: 'Add' });
-  const nlChips = nlBar.createDiv({ cls: 'gtd-nl-chips' });
-
-  const updateNlChips = (): void => {
-    const value = nlInput.value.trim();
-    const todayStr = ctx.getTodayDateString();
-    if (!value) {
-      renderParseChips(nlChips, null, '', todayStr);
-      return;
-    }
-    const parsed = parseNaturalLanguageInput(value, todayStr);
-    const live = ctx.getState();
-    const destLabel = previewDestinationLabel(parsed, live.viewMode, todayStr, live.dateAnchor);
-    renderParseChips(nlChips, parsed, destLabel, todayStr);
-  };
-  updateNlChips();
-
-  nlInput.addEventListener('input', updateNlChips);
-  nlInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      void commitNl();
-    }
-  });
-  nlAdd.addEventListener('click', () => {
-    void commitNl();
-  });
-
-  async function commitNl(): Promise<void> {
-    const value = nlInput.value.trim();
-    if (!value) return;
-    const parsed = parseNaturalLanguageInput(value, ctx.getTodayDateString());
-    nlInput.value = '';
-    updateNlChips();
-    await ctx.taskMutator.quickAddTask('gtd-inbox', parsed.description, undefined, parsed);
-    const refocus = (): void => {
-      container.querySelector<HTMLInputElement>('.gtd-nl-bar-input')?.focus();
-    };
-    refocus();
-    requestAnimationFrame(refocus);
-  }
 
   // Role chips row (All pill + configured role pills + Untagged pill)
   const roleChipsWrapper = toolbar.createDiv({ cls: 'gtd-role-chips-wrapper' });

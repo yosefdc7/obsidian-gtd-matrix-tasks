@@ -49,7 +49,8 @@ export class GTDMatrixView extends ItemView {
       activeChip: 'all',
       selectedFolder: 'all',
       collapsedSections: new Set<SectionId>(),
-      optionsOpen: false
+      optionsOpen: false,
+      mobileSearchOpen: false
     };
 
     if (settings) {
