@@ -1,6 +1,6 @@
 {
   "name": "gtd-matrix-tasks",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "An interactive, drag-and-drop GTD & Eisenhower Matrix task list view for Obsidian.",
   "main": "main.js",
   "type": "module",

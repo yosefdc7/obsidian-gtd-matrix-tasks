@@ -4,9 +4,21 @@
 Port the approved **Stream UI** direction into the plugin on the ADR 0005 modular renderers (ADR 0008): the List layout becomes the Stream list, shared chrome (header, NL quick-add, role chips, every add-composer, quick-capture modal) gets the Stream treatment, and secondary toolbar controls move behind an options disclosure. The Board keeps its kanban structure (drag-drop, swimlanes, mobile carousel untouched). Source design: `2nd Brain/prototypes/gtd-ui/refined-stream.html` (untouched).
 
 ## Status
-Converted Quick Capture modal into top-docked sheet (`21558a6 [antigravity] fix: convert quick capture modal into top-docked sheet to prevent mobile keyboard overlap`). All 214 unit tests passing (`214/214`), TypeScript compilation clean (`tsc --noEmit` exit 0), bundle built and deployed to `2nd brain v7`, verified zero errors in Obsidian.
+Bumped version to `v1.0.1` (`manifest.json`, `package.json`), rebuilt, deployed to `2nd brain v7`, and successfully pushed to Obsidian Sync cloud to invalidate mobile cache. All 214 unit tests passing (`214/214`), clean build, verified `manifest.json`, `main.js`, and `styles.css` are synced to cloud server.
 
 ## Completed
+- Released v1.0.1 & Synced to Cloud for Mobile Cache Invalidation:
+  - Bumped version to `1.0.1` in `manifest.json` and `package.json`.
+  - Built production bundle (`npm run build`) and deployed to `C:\Users\josef\Documents\2nd brain v7\.obsidian\plugins\gtd-matrix-tasks\`.
+  - Triggered Obsidian Sync scan; confirmed `manifest.json` (hash `caab3053...`), `main.js` (hash `774e35d9...`), and `styles.css` (hash `000f33cd...`) are uploaded and fully synced on remote server.
+- Streamlined Mobile Header & Removed Top Quick-Add Bar (`src/view/toolbar-renderer.ts`, `src/view/types.ts`, `src/view/view.ts`, `styles.css`):
+  - **Removed Top Quick-Add Bar Everywhere**: Completely removed `.gtd-nl-bar` and natural-language parse chips from the toolbar on both desktop and mobile; mobile quick capture relies on the floating `+` FAB (opening quick capture sheet), while desktop and mobile retain inline section/column composers (`+ Add task`).
+  - **Decluttered Mobile Header**: Hidden brand header ("GTD Matrix Tasks") and stats pill on mobile viewports (`@media (max-width: 768px), (pointer: coarse)`), reclaiming ~80px of top vertical screen height so tasks appear immediately below controls.
+  - **Responsive Mode Switcher Labels**: Shortened "GTD Workflow" to "GTD" on mobile (`.gtd-mode-label-short` / `.gtd-mode-label-full`) so `[GTD] [Eisenhower] [By Date]` and header action icons fit side-by-side on a single compact 36px row.
+  - **By Date Anchor Sub-Row**: Positioned Date Anchors (`[Start] [Scheduled] [Due]`) as a compact sub-row directly beneath mode tabs on mobile when By Date is active.
+  - **Expandable Mobile Search**: Replaced the static full-width search input with a 36px search toggle button (`.gtd-search-toggle-btn`) next to the Options button; tapping reveals a compact mobile search row (`.gtd-mobile-search-row`) with input and clear ('X') button. If an active search query exists, the row automatically stays open.
+  - **Fixed Button Padding**: Added `padding: 0 !important;` to `.gtd-search-toggle-btn` and `.gtd-options-toggle` to prevent Obsidian's `.is-tablet button` padding rules from squishing SVG icons.
+  - **Verification**: 214/214 Vitest tests passing, 0 TypeScript errors, bundle built and deployed to `2nd brain v7`, live-verified in Obsidian via CDP device emulation (390×844) with 0 errors captured. Committed `2eb699a`.
 - Quick Capture Top Sheet (`src/view/quick-capture-modal.ts`, `styles.css`):
   - Fixed mobile keyboard overlap by anchoring the Quick Capture sheet to the top of the viewport (`align-items: flex-start`).
   - Added slide-down animation (`@keyframes gtdSlideDown`, `translateY(-100%)` -> `translateY(0)`).
