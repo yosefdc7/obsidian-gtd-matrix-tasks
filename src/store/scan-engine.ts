@@ -6,6 +6,7 @@ import { RoleResolver } from './role-resolver';
 
 export class ScanEngine {
   public debouncedScan: () => void;
+  private currentScanPromise: Promise<TaskItem[]> | null = null;
 
   constructor(
     private app: App,
@@ -32,25 +33,48 @@ export class ScanEngine {
   }
 
   public async scanVault(): Promise<TaskItem[]> {
-    const files = this.app.vault.getMarkdownFiles().filter((f) => !this.isExcluded(f.path));
+    if (this.currentScanPromise) {
+      return this.currentScanPromise;
+    }
 
-    const allTasks: TaskItem[] = [];
-    const CHUNK_SIZE = 50;
+    this.currentScanPromise = (async () => {
+      try {
+        const files = this.app.vault.getMarkdownFiles().filter((f) => !this.isExcluded(f.path));
 
-    for (let i = 0; i < files.length; i += CHUNK_SIZE) {
-      const chunk = files.slice(i, i + CHUNK_SIZE);
-      await Promise.all(
-        chunk.map(async (file) => {
-          try {
-            const content = await this.app.vault.cachedRead(file);
-            const lines = content.split('\n');
-            const cache = this.app.metadataCache.getFileCache(file);
+        const allTasks: TaskItem[] = [];
+        const CHUNK_SIZE = 50;
 
-            if (cache?.listItems) {
-              for (const item of cache.listItems) {
-                if (item.task !== undefined) {
-                  const lineIdx = item.position.start.line;
-                  if (lineIdx < lines.length) {
+        for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+          const chunk = files.slice(i, i + CHUNK_SIZE);
+          await Promise.all(
+            chunk.map(async (file) => {
+              const cache = this.app.metadataCache.getFileCache(file);
+              // Skip reading file if metadata cache is populated and has no tasks
+              if (cache && (!cache.listItems || !cache.listItems.some((item) => item.task !== undefined))) {
+                return;
+              }
+
+              try {
+                const content = await this.app.vault.cachedRead(file);
+                const lines = content.split('\n');
+
+                if (cache?.listItems) {
+                  for (const item of cache.listItems) {
+                    if (item.task !== undefined) {
+                      const lineIdx = item.position.start.line;
+                      if (lineIdx < lines.length) {
+                        const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
+                        if (task) {
+                          const res = this.roleResolver.resolveTaskRole(task);
+                          task.effectiveRole = res.role;
+                          task.roleSource = res.source;
+                          allTasks.push(task);
+                        }
+                      }
+                    }
+                  }
+                } else {
+                  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
                     const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
                     if (task) {
                       const res = this.roleResolver.resolveTaskRole(task);
@@ -60,27 +84,22 @@ export class ScanEngine {
                     }
                   }
                 }
+              } catch (err) {
+                console.error(`Error reading ${file.path} in GTD Matrix Tasks:`, err);
               }
-            } else {
-              for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-                const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-                if (task) {
-                  const res = this.roleResolver.resolveTaskRole(task);
-                  task.effectiveRole = res.role;
-                  task.roleSource = res.source;
-                  allTasks.push(task);
-                }
-              }
-            }
-          } catch (err) {
-            console.error(`Error reading ${file.path} in GTD Matrix Tasks:`, err);
-          }
-        })
-      );
-    }
+            })
+          );
+        }
 
-    this.store.setTasks(allTasks);
-    return allTasks;
+        this.store.setTasks(allTasks);
+        await this.store.saveSnapshot();
+        return allTasks;
+      } finally {
+        this.currentScanPromise = null;
+      }
+    })();
+
+    return this.currentScanPromise;
   }
 
   public async reindexFile(file: TFile): Promise<void> {

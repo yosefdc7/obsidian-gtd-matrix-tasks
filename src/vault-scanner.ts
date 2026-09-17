@@ -1,4 +1,4 @@
-import { App, TFile } from 'obsidian';
+import { App, TFile, normalizePath } from 'obsidian';
 import { TaskItem, TaskPriority, SectionId, PluginSettings, RoleId } from './types';
 import { TaskStore } from './store/task-store';
 import { RoleResolver, ResolvedRole } from './store/role-resolver';
@@ -16,12 +16,24 @@ export class VaultScanner {
 
   constructor(app: App, settings: PluginSettings) {
     this.store = new TaskStore();
+    const configDir = app.vault.configDir || '.obsidian';
+    const cachePath = normalizePath(`${configDir}/plugins/gtd-matrix-tasks/task-cache.json`);
+    this.store.configureSnapshot(app.vault.adapter, cachePath);
+
     this.roleResolver = new RoleResolver(app, parseConfiguredRoles(settings.configuredRoleTags));
     this.scanEngine = new ScanEngine(app, settings, this.store, this.roleResolver);
     this.mutator = new TaskMutator(app, settings, this.scanEngine);
 
     this.debouncedScan = this.scanEngine.debouncedScan;
     this.debouncedNotify = this.store.debouncedNotify;
+  }
+
+  public async loadSnapshot(): Promise<boolean> {
+    return this.store.loadSnapshot();
+  }
+
+  public async saveSnapshot(): Promise<void> {
+    return this.store.saveSnapshot();
   }
 
   public onTasksUpdated(callback: (tasks: TaskItem[]) => void): () => void {

@@ -81,10 +81,9 @@ export class GTDMatrixView extends ItemView {
     this.unsubscribe = this.scanner.onTasksUpdated(() => {
       this.render();
     });
+    this.render();
     if (this.scanner.getTasks().length === 0) {
       void this.scanner.scanVault().then(() => this.render());
-    } else {
-      this.render();
     }
   }
 
@@ -94,11 +93,11 @@ export class GTDMatrixView extends ItemView {
         this.render();
       });
     }
-
+    this.render();
     if (this.scanner.getTasks().length === 0) {
       await this.scanner.scanVault();
+      this.render();
     }
-    this.render();
   }
 
   async onClose(): Promise<void> {

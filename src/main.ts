@@ -19,6 +19,7 @@ export default class GTDMatrixPlugin extends Plugin {
     await this.loadSettings();
 
     this.scanner = new VaultScanner(this.app, this.settings);
+    await this.scanner.loadSnapshot();
     this.autoMover = new AutoMover(this.app, this.settings);
     this.hoverManager = new HoverManager(this.app, this.settings);
 
@@ -100,6 +101,11 @@ export default class GTDMatrixPlugin extends Plugin {
       void this.autoMover.evictNonDateNotesFromJots();
       if (this.settings.autoInheritParentLinks !== false) {
         void this.reconcileActiveDailyJots(false);
+      }
+      if (this.scanner.getTasks().length === 0) {
+        void this.scanner.scanVault();
+      } else {
+        window.setTimeout(() => void this.scanner.scanVault(), 2500);
       }
     });
 
@@ -279,6 +285,7 @@ export default class GTDMatrixPlugin extends Plugin {
   }
 
   onunload(): void {
+    void this.scanner?.saveSnapshot();
     this.hoverManager?.destroy();
     this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
       if (leaf.view instanceof MarkdownView) {
