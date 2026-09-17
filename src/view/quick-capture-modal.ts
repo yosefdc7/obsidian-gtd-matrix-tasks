@@ -37,7 +37,10 @@ export function openQuickAddModal(ctx: ViewContext, sectionId?: SectionId): void
   const input = sheet.createEl('input', {
     type: 'text',
     cls: 'gtd-modal-input',
-    placeholder: 'What needs to be done?'
+    placeholder: 'What needs to be done?',
+    attr: {
+      enterkeyhint: 'send'
+    }
   });
   const chipsEl = sheet.createDiv({ cls: 'gtd-nl-chips gtd-modal-nl-chips' });
 

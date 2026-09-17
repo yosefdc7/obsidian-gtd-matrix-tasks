@@ -1714,7 +1714,7 @@
   height: 24px;
 }
 
-/* Mobile Quick Add Modal / Bottom Sheet */
+/* Mobile Quick Add Modal / Top Sheet */
 .gtd-modal-backdrop {
   position: fixed;
   top: 0;
@@ -1725,7 +1725,7 @@
   backdrop-filter: blur(2px);
   z-index: 1100;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
   animation: gtdFadeIn 0.15s ease-out;
 }
@@ -1734,15 +1734,18 @@
   background: var(--background-primary);
   width: 100%;
   max-width: 540px;
-  border-radius: 16px 16px 0 0;
+  border-radius: 0 0 16px 16px;
   border: 1px solid var(--background-modifier-border);
-  border-bottom: none;
-  padding: 16px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+  border-top: none;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 18px 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3);
-  animation: gtdSlideUp 0.2s ease-out;
+  gap: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: gtdSlideDown 0.2s ease-out;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 @keyframes gtdFadeIn {
@@ -1750,8 +1753,8 @@
   to { opacity: 1; }
 }
 
-@keyframes gtdSlideUp {
-  from { transform: translateY(100%); }
+@keyframes gtdSlideDown {
+  from { transform: translateY(-100%); }
   to { transform: translateY(0); }
 }
 
@@ -1796,7 +1799,7 @@
 .gtd-modal-options-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .gtd-modal-options-label {
@@ -1841,8 +1844,8 @@
 }
 
 .gtd-modal-submit-btn {
-  margin-top: 6px;
-  padding: 12px;
+  margin-top: 4px;
+  padding: 10px 12px;
   border-radius: 8px;
   background: var(--interactive-accent);
   color: var(--text-on-accent);
