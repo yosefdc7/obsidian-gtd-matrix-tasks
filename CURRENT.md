@@ -4,9 +4,26 @@
 Port the approved **Stream UI** direction into the plugin on the ADR 0005 modular renderers (ADR 0008): the List layout becomes the Stream list, shared chrome (header, NL quick-add, role chips, every add-composer, quick-capture modal) gets the Stream treatment, and secondary toolbar controls move behind an options disclosure. The Board keeps its kanban structure (drag-drop, swimlanes, mobile carousel untouched). Source design: `2nd Brain/prototypes/gtd-ui/refined-stream.html` (untouched).
 
 ## Status
-Set default view mode to "By Date" anchored to "Scheduled" date (`[antigravity] feat: default view mode to By Date (Scheduled)`). Configurable role tags setting, "All" pill filter, and exclusive radio-style role filtering delivered and verified (`189/189` tests, `tsc --noEmit` exit 0).
+Delivered snapshot cache persistence (`.obsidian/plugins/gtd-matrix-tasks/task-cache.json`) and metadata-gated scanning in `obsidian-gtd-matrix-tasks` (`122e0ac [antigravity] feat: add snapshot cache persistence and metadata-gated scan for instant view loading`). All 210 unit tests passing (`210/210`), TypeScript compilation clean (`tsc --noEmit` exit 0), bundle built and deployed to `2nd brain v7`.
 
 ## Completed
+- Snapshot Cache Persistence & Metadata-Gated Scanning (`src/store/task-store.ts`, `src/store/scan-engine.ts`, `src/vault-scanner.ts`, `src/view/view.ts`, `src/main.ts`, `tests/task-store-snapshot.test.ts`):
+  - Added persistent snapshot adapter to `TaskStore` targeting `.obsidian/plugins/gtd-matrix-tasks/task-cache.json`.
+  - Implemented `loadSnapshot` to hydrate tasks instantly (~2ms) into `this.tasks` on plugin startup and view open.
+  - Implemented debounced snapshot serialization (`debouncedSaveSnapshot`) on task mutations and instant write on scan completion.
+  - Metadata-Gated Scanning: In `ScanEngine.scanVault()`, inspects `metadataCache.getFileCache(file)`. Files with no list items / tasks are skipped immediately without executing `cachedRead` or string splitting, eliminating ~1,400 unnecessary disk/file operations across the 1,500-note vault.
+  - Single-Flight Concurrency Guard: Added `currentScanPromise` to deduplicate simultaneous scan triggers from view opening and layout readiness.
+  - View Optimization: `GTDMatrixView.onload()` and `onOpen()` render immediately when tasks are loaded from snapshot; background scan reconciles edits without blocking the UI.
+  - 4 unit tests in `tests/task-store-snapshot.test.ts` verifying snapshot save/load, listener notification, error recovery on corrupted JSON, and schema version gating.
+  - Committed with conventional tag `122e0ac`.
+- Inline Auto-Complete for Task Editor (`src/view/inline-suggest.ts`, `src/view/card-renderer.ts`, `styles.css`):
+  - Built custom floating popover (`.gtd-suggest-popover`) attached to the task description inline `<input>`.
+  - Wikilink autocomplete triggered on `[[`: queries vault markdown files via `app.vault.getMarkdownFiles()` and `app.metadataCache.getCachedFiles()`, displaying note title and parent folder subtext. Inserting replaces the query with `[[Note Name]]` without duplicating closing brackets.
+  - Tag autocomplete triggered on `#`: queries vault tags via `app.metadataCache.getTags()`, displaying tag names with `#` prefix. Inserting replaces query with `#tag `.
+  - Keyboard navigation: `ArrowUp`/`ArrowDown` navigates suggestions (with wrapping), `Enter` or `Tab` applies the selection (preventing task save/submit), `Escape` dismisses the popover (without canceling input edit).
+  - Mouse navigation: clicking any item applies selection; `mousedown` on popover prevents stealing focus from input.
+  - 17 unit tests in `tests/inline-suggest.test.ts` verifying trigger detection, ranking, and replacement offset calculations.
+  - Deployed and live verified in `2nd brain v7` with zero runtime errors. Commit: `b48e1cf`.
 - Role Filter Pills & Filtering:
   - Added "All" pill to role filter chips row (`All`, then configured roles, then `Untagged`).
   - Exclusive radio-style filtering: clicking a pill (e.g. `Untagged`) activates *only* that pill and shows only tasks for that role.
