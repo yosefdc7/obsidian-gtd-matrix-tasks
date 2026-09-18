@@ -176,7 +176,7 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
 
   // Circular status button: plain click = complete/uncomplete; Ctrl+click = status picker
   const checkBtn = itemEl.createEl('button', {
-    cls: `gtd-row-check ${task.isCompleted ? 'is-checked' : ''}`,
+    cls: `gtd-row-check ${task.isCompleted ? 'is-checked' : ''} prio-${task.priority}`,
     attr: { 'aria-label': task.isCompleted ? 'Mark incomplete (Ctrl+click for status menu)' : 'Complete task (Ctrl+click for status menu)' }
   });
   // Completed → filled check icon; Uncompleted → CSS ring only (no icon needed)
@@ -296,22 +296,25 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     });
   }
 
-  // Priority chip (icon-only; color and tooltip carry the level)
-  const priorityBtn = metaEl.createEl('button', {
-    cls: `gtd-priority-badge priority-${task.priority}`,
-    attr: { 'aria-label': `Priority: ${getPriorityLabel(task.priority)} — click to change` }
-  });
-  setIcon(priorityBtn, 'arrow-up-down');
-  priorityBtn.title = `Priority: ${getPriorityLabel(task.priority)}`;
-  priorityBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    showPriorityMenu(e, task, ctx);
-  });
+  // Priority chip (sleek badge, only rendered if priority is set)
+  if (task.priority && task.priority !== 'none') {
+    const priorityBtn = metaEl.createEl('button', {
+      cls: `gtd-priority-badge priority-${task.priority} is-active-priority`,
+      attr: { 'aria-label': `Priority: ${getPriorityLabel(task.priority)} — click to change` }
+    });
+    setIcon(priorityBtn, 'flag');
+    priorityBtn.createSpan({ cls: 'gtd-priority-label', text: getPriorityLabel(task.priority) });
+    priorityBtn.title = `Priority: ${getPriorityLabel(task.priority)}`;
+    priorityBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showPriorityMenu(e, task, ctx);
+    });
+  }
 
-  // Origin note / Project link
+  // Origin note / Project link (clean icon without raw brackets)
   const fileLink = metaEl.createEl('a', {
     cls: `gtd-file-link ${task.isProject ? 'is-project-link' : ''}`,
-    text: task.isProject ? `📂 ${task.fileName}` : `[[${task.fileName}]]`
+    text: task.isProject ? `📂 ${task.fileName}` : `📄 ${task.fileName}`
   });
   fileLink.title = `Open ${task.filePath} in a new tab`;
   fileLink.addEventListener('click', (e) => {
@@ -347,11 +350,11 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
     roleBadge.title = `Role source: ${task.roleSource}`;
   }
 
-  // Hover action cluster: schedule, move-to-column, more menu
+  // Action cluster: schedule, move-to-column, more menu
   const actionsEl = itemEl.createDiv({ cls: 'gtd-row-actions' });
 
   const scheduleBtn = actionsEl.createEl('button', {
-    cls: 'gtd-row-action-btn',
+    cls: 'gtd-row-action-btn gtd-action-schedule',
     attr: { 'aria-label': 'Schedule' }
   });
   setIcon(scheduleBtn, 'calendar');
@@ -362,7 +365,7 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
   });
 
   const moveColBtn = actionsEl.createEl('button', {
-    cls: 'gtd-row-action-btn',
+    cls: 'gtd-row-action-btn gtd-action-move',
     attr: { 'aria-label': 'Move to column' }
   });
   setIcon(moveColBtn, 'columns');
@@ -373,7 +376,7 @@ export function renderTaskItem(container: HTMLElement, task: TaskItem, ctx: View
   });
 
   const actionBtn = actionsEl.createEl('button', {
-    cls: 'gtd-row-action-btn',
+    cls: 'gtd-row-action-btn gtd-action-more',
     attr: { 'aria-label': 'Task actions' }
   });
   setIcon(actionBtn, 'more-horizontal');

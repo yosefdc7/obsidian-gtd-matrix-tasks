@@ -3,6 +3,7 @@ import { getEisenhowerSection, getGTDSection, parseConfiguredRoles } from '../pa
 import { EISENHOWER_SECTIONS, GTD_SECTIONS } from './types';
 import type { ViewContext } from './types';
 import type { RoleId, SectionId, TaskItem, TaskPriority } from '../types';
+import { showCalendarPicker } from './calendar-picker';
 
 /** Priority picker shared by the card priority button and the action menu. */
 export function showPriorityMenu(e: MouseEvent, task: TaskItem, ctx: ViewContext): void {
@@ -94,7 +95,50 @@ export function showTaskActionMenu(e: MouseEvent, task: TaskItem, ctx: ViewConte
 
   menu.addSeparator();
 
-  // 2. GTD state transitions
+  // 2. Schedule & Due Dates
+  menu.addItem((item) => {
+    item
+      .setTitle(task.scheduledDate ? `Scheduled: ${task.scheduledDate}` : 'Set Scheduled Date...')
+      .setIcon('calendar')
+      .onClick(() => {
+        showCalendarPicker(e.target as HTMLElement, {
+          currentDate: task.scheduledDate,
+          todayDate: ctx.getTodayDateString(),
+          onSelect: async (date) => {
+            await ctx.taskMutator.setScheduledDate(task, date);
+          }
+        });
+      });
+  });
+
+  menu.addItem((item) => {
+    item
+      .setTitle(task.dueDate ? `Due: ${task.dueDate}` : 'Set Due Date...')
+      .setIcon('clock')
+      .onClick(() => {
+        showCalendarPicker(e.target as HTMLElement, {
+          currentDate: task.dueDate,
+          todayDate: ctx.getTodayDateString(),
+          onSelect: async (date) => {
+            await ctx.taskMutator.setDueDate(task, date);
+          }
+        });
+      });
+  });
+
+  // 3. Move to Column / Section
+  menu.addItem((item) => {
+    item
+      .setTitle('Move to Column...')
+      .setIcon('columns')
+      .onClick(() => {
+        showMoveColumnMenu(e, task, ctx);
+      });
+  });
+
+  menu.addSeparator();
+
+  // 4. GTD state quick transitions
   const moves: { title: string; icon: string; section: SectionId }[] = [
     { title: 'Move to Next Actions', icon: 'zap', section: 'gtd-next-actions' },
     { title: 'Schedule (Set Today+10)', icon: 'calendar', section: 'gtd-scheduled' },
@@ -115,7 +159,7 @@ export function showTaskActionMenu(e: MouseEvent, task: TaskItem, ctx: ViewConte
 
   menu.addSeparator();
 
-  // 3. Priority picker
+  // 5. Priority picker
   menu.addItem((item) => {
     item
       .setTitle('Change Priority...')

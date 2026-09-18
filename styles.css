@@ -183,6 +183,77 @@
   color: var(--text-normal);
 }
 
+/* Role Filter Carousel */
+.gtd-role-chips-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 3px 0 5px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.gtd-role-chips-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.gtd-role-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--background-modifier-border) !important;
+  background: var(--background-secondary) !important;
+  color: var(--text-muted) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 24px !important;
+  box-shadow: none !important;
+  transition: all 0.15s ease;
+}
+
+.gtd-role-chip-btn:hover {
+  background: var(--background-modifier-hover) !important;
+  color: var(--text-normal) !important;
+}
+
+.gtd-role-chip-btn.is-active {
+  border-color: var(--interactive-accent) !important;
+  background: rgba(var(--interactive-accent-rgb, 120, 120, 255), 0.12) !important;
+  color: var(--text-normal) !important;
+  font-weight: 600 !important;
+}
+
+.gtd-role-chip-btn.has-custom-color.is-active {
+  border-color: var(--role-color) !important;
+}
+
+.gtd-role-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Anchor Switcher ([Start] [Scheduled] [Due]) */
+.gtd-anchor-switcher {
+  display: inline-flex;
+  border-radius: 6px;
+  padding: 1px !important;
+  gap: 1px;
+}
+
+.gtd-anchor-switcher .gtd-mode-btn {
+  padding: 3px 8px !important;
+  font-size: 11px !important;
+  min-height: 24px !important;
+  border-radius: 5px !important;
+}
+
 .gtd-stats-pill {
   font-size: 0.85em;
   font-weight: 500;
@@ -620,15 +691,16 @@
   width: 18px;
   height: 18px;
   margin: 3px 0 0;
-  padding: 0;
+  padding: 0 !important;
   border-radius: 50%;
   border: 1.5px solid var(--text-faint);
-  background: transparent;
+  background: transparent !important;
   color: transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  box-shadow: none !important;
   transition: border-color 0.15s, background-color 0.15s, color 0.15s;
 }
 
@@ -637,15 +709,32 @@
   height: 11px;
 }
 
+/* Priority ring colors on checkbox */
+.gtd-row-check.prio-highest {
+  border-color: #ef4444;
+}
+.gtd-row-check.prio-high {
+  border-color: #f97316;
+}
+.gtd-row-check.prio-medium {
+  border-color: #eab308;
+}
+.gtd-row-check.prio-low {
+  border-color: #3b82f6;
+}
+.gtd-row-check.prio-none {
+  border-color: var(--text-faint);
+}
+
 .gtd-row-check:hover {
   border-color: var(--interactive-accent);
   color: var(--interactive-accent);
 }
 
 .gtd-row-check.is-checked {
-  background-color: var(--interactive-accent);
-  border-color: var(--interactive-accent);
-  color: var(--text-on-accent);
+  background-color: var(--interactive-accent) !important;
+  border-color: var(--interactive-accent) !important;
+  color: var(--text-on-accent) !important;
 }
 
 /* Row body: title + meta chips */
@@ -657,12 +746,13 @@
   gap: 3px;
 }
 
-/* Hover action cluster (schedule, move, more) */
+/* Action cluster (schedule, move, more) */
 .gtd-row-actions {
   display: flex;
   align-items: center;
   gap: 2px;
   opacity: 0;
+  flex-shrink: 0;
   transition: opacity 0.15s ease;
 }
 
@@ -671,7 +761,7 @@
   opacity: 1;
 }
 
-@media (hover: none) {
+@media (hover: none), (max-width: 768px) {
   .gtd-row-actions {
     opacity: 1;
   }
@@ -684,15 +774,17 @@
   width: 26px;
   height: 26px;
   border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--text-faint);
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-muted);
   cursor: pointer;
+  padding: 0 !important;
   transition: background-color 0.15s, color 0.15s;
 }
 
 .gtd-row-action-btn:hover {
-  background-color: var(--background-modifier-hover);
+  background-color: var(--background-modifier-hover) !important;
   color: var(--text-normal);
 }
 
@@ -712,7 +804,10 @@
 .gtd-matrix-view button.gtd-options-toggle,
 .gtd-matrix-view button.gtd-layout-btn,
 .gtd-matrix-view button.gtd-fab-btn {
-  padding: 0;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 /* Board card checkbox */
@@ -2059,55 +2154,128 @@
     padding: 10px 8px;
   }
 
-  /* Card ergonomics & touch targets */
+  /* Card & Stream row ergonomics */
   .gtd-board-card {
-    padding: 12px 12px 10px;
-    gap: 8px;
-    border-radius: 10px;
-  }
-
-  .gtd-board-card-desc {
-    font-size: 0.95em;
-    line-height: 1.45;
-  }
-
-  .gtd-task-item {
-    padding: 10px 12px;
-    gap: 12px;
+    padding: 10px 10px 8px;
+    gap: 6px;
     border-radius: 8px;
   }
 
-  .gtd-checkbox {
-    width: 22px;
-    height: 22px;
-    min-width: 22px;
-    border-radius: 5px;
-    cursor: pointer;
+  .gtd-board-card-desc {
+    font-size: 0.9em;
+    line-height: 1.4;
   }
 
-  .gtd-priority-badge {
-    min-height: 28px;
-    min-width: 28px;
-    padding: 2px 6px;
+  .gtd-task-item {
+    padding: 8px 8px;
+    gap: 8px;
+    border-radius: 8px;
   }
 
-  .gtd-move-col-btn {
-    min-height: 28px;
-    min-width: 28px;
-    width: 28px;
-    height: 28px;
+  .gtd-row-check {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    margin-top: 2px !important;
+  }
+
+  /* Single compact action button on mobile */
+  .gtd-row-actions .gtd-action-schedule,
+  .gtd-row-actions .gtd-action-move {
+    display: none !important;
+  }
+
+  .gtd-row-actions {
+    opacity: 1 !important;
+    align-self: flex-start;
+    margin-top: -2px;
+  }
+
+  .gtd-row-action-btn.gtd-action-more {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--text-muted);
+  }
+
+  .gtd-task-desc {
+    font-size: 0.9em;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+
+  /* Compact modern metadata chips */
+  .gtd-task-meta {
+    gap: 5px;
+    margin-top: 3px;
+    flex-wrap: wrap;
   }
 
   .gtd-date-pill {
-    min-height: 28px;
-    padding: 4px 9px;
-    font-size: 0.82em;
+    min-height: 22px !important;
+    padding: 2px 7px !important;
+    font-size: 11px !important;
+    font-weight: 500;
+    border-radius: 5px !important;
+    border: 1px solid var(--background-modifier-border) !important;
+    background: var(--background-secondary) !important;
+    box-shadow: none !important;
+    color: var(--text-muted);
+  }
+
+  .gtd-date-pill.is-overdue {
+    color: var(--text-error) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+    background: rgba(239, 68, 68, 0.08) !important;
+  }
+
+  .gtd-date-pill.is-today {
+    color: var(--text-accent) !important;
+    border-color: rgba(var(--interactive-accent-rgb, 120, 120, 255), 0.4) !important;
+    background: rgba(var(--interactive-accent-rgb, 120, 120, 255), 0.08) !important;
   }
 
   .gtd-file-link {
-    min-height: 28px;
-    padding: 4px 8px;
-    font-size: 0.82em;
+    min-height: 22px !important;
+    padding: 2px 7px !important;
+    font-size: 11px !important;
+    border-radius: 5px !important;
+    border: 1px solid var(--background-modifier-border) !important;
+    background: var(--background-secondary) !important;
+    color: var(--text-faint) !important;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  .gtd-role-badge {
+    min-height: 22px !important;
+    padding: 2px 7px !important;
+    font-size: 11px !important;
+    border-radius: 5px !important;
+    border: 1px solid var(--background-modifier-border) !important;
+    background: var(--background-secondary) !important;
+    color: var(--text-muted) !important;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gtd-priority-badge.is-active-priority {
+    min-height: 22px !important;
+    padding: 2px 6px !important;
+    font-size: 10px !important;
+    font-weight: 600;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 }
 
