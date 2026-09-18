@@ -799,7 +799,6 @@
  * and would squeeze the icon to zero width; the scoped selector ties on
  * specificity and wins by source order.
  */
-.gtd-matrix-view button.gtd-row-check,
 .gtd-matrix-view button.gtd-row-action-btn,
 .gtd-matrix-view button.gtd-options-toggle,
 .gtd-matrix-view button.gtd-layout-btn,
@@ -808,6 +807,56 @@
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
+}
+
+.gtd-matrix-view button.gtd-row-check {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  border-radius: 50% !important;
+  border: 1.5px solid var(--text-muted) !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 3px 0 0 !important;
+  box-shadow: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s !important;
+}
+
+.gtd-matrix-view button.gtd-row-check.prio-highest {
+  border-color: #ef4444 !important;
+}
+.gtd-matrix-view button.gtd-row-check.prio-high {
+  border-color: #f97316 !important;
+}
+.gtd-matrix-view button.gtd-row-check.prio-medium {
+  border-color: #eab308 !important;
+}
+.gtd-matrix-view button.gtd-row-check.prio-low {
+  border-color: #3b82f6 !important;
+}
+.gtd-matrix-view button.gtd-row-check.prio-none {
+  border-color: var(--text-muted) !important;
+}
+
+.gtd-matrix-view button.gtd-row-check:hover {
+  border-color: var(--interactive-accent) !important;
+}
+
+.gtd-matrix-view button.gtd-row-check.is-checked {
+  background-color: var(--interactive-accent) !important;
+  border-color: var(--interactive-accent) !important;
+  color: var(--text-on-accent) !important;
+}
+
+.gtd-matrix-view button.gtd-row-check svg {
+  width: 11px !important;
+  height: 11px !important;
 }
 
 /* Board card checkbox */
@@ -2172,11 +2221,15 @@
     border-radius: 8px;
   }
 
-  .gtd-row-check {
-    width: 20px !important;
-    height: 20px !important;
-    min-width: 20px !important;
+  .gtd-row-check,
+  .gtd-matrix-view button.gtd-row-check {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    min-height: 18px !important;
     margin-top: 2px !important;
+    border: 1.5px solid var(--text-muted) !important;
+    border-radius: 50% !important;
   }
 
   /* Single compact action button on mobile */
