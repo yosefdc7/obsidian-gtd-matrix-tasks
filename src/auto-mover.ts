@@ -2,12 +2,15 @@
 import type { App, TFile, CachedMetadata } from 'obsidian';
 import { isDateTitledNote } from './date-utils';
 import { PluginSettings } from './types';
+import { extractRoleFromIdentities } from './parser';
 
 export function normalizePath(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\//, '').replace(/\/$/, '');
 }
 
 export const EXCLUDED_PREFIXES = [
+  'System/Templates/',
+  'System/Tests/',
   'References/Templates/',
   'References/System/',
   'zArchive/',
@@ -80,12 +83,15 @@ export const RESOURCE_TAG_MAP: Record<string, string[]> = {
 };
 
 export const ROLE_PROJECT_MAP: Record<string, string> = {
-  'role/yo-manager': 'Roles/Yo Manager/Projects',
-  'yo-manager': 'Roles/Yo Manager/Projects',
-  'role/josef-selfcare': 'Roles/Josef Self-Care/Projects',
-  'josef-selfcare': 'Roles/Josef Self-Care/Projects',
-  'role/rj-supportive': 'Roles/RJ Supportive/Projects',
-  'rj-supportive': 'Roles/RJ Supportive/Projects'
+  'role/yo-manager': '00 Identity/Yo the Manager/Projects',
+  'yo-manager': '00 Identity/Yo the Manager/Projects',
+  'yo the manager': '00 Identity/Yo the Manager/Projects',
+  'role/josef-selfcare': '00 Identity/Josef with Self Care/Projects',
+  'josef-selfcare': '00 Identity/Josef with Self Care/Projects',
+  'josef with self care': '00 Identity/Josef with Self Care/Projects',
+  'role/rj-supportive': '00 Identity/RJ the Supportive/Projects',
+  'rj-supportive': '00 Identity/RJ the Supportive/Projects',
+  'rj the supportive': '00 Identity/RJ the Supportive/Projects'
 };
 
 export function normalizeTag(tag: string): string {
@@ -148,6 +154,13 @@ export function determineDestinationFolder(
     (typeof frontmatter?.type === 'string' && frontmatter.type.toLowerCase() === 'project');
 
   if (isProject) {
+    if (frontmatter?.identities) {
+      const identityRole = extractRoleFromIdentities(frontmatter.identities);
+      if (identityRole && ROLE_PROJECT_MAP[identityRole]) {
+        return ROLE_PROJECT_MAP[identityRole];
+      }
+    }
+
     for (const [roleKey, targetFolder] of Object.entries(ROLE_PROJECT_MAP)) {
       if (normalizedTags.includes(roleKey)) {
         return targetFolder;

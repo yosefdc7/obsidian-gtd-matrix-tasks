@@ -186,7 +186,7 @@ export function showTaskActionMenu(e: MouseEvent, task: TaskItem, ctx: ViewConte
         .setIcon(r.icon)
         .setChecked(task.effectiveRole === (r.id || 'untagged'))
         .onClick(async () => {
-          await ctx.taskMutator.setRole(task, r.id);
+          await ctx.taskMutator.setRole(task, r.id, configured);
         });
     });
   }

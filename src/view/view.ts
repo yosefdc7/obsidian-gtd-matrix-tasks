@@ -148,7 +148,8 @@ export class GTDMatrixView extends ItemView {
       this.viewState.viewMode,
       this.scanner.mutator,
       this.scanner.getTodayDateString(),
-      roleTag
+      roleTag,
+      this.scanner.roleResolver.getConfiguredRoles()
     );
   }
 

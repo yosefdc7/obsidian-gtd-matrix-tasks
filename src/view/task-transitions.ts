@@ -1,4 +1,4 @@
-import { DateAnchorField, RoleId, SectionId, TaskItem, ViewMode } from '../types';
+import { DateAnchorField, RoleId, SectionId, TaskItem, ViewMode, ConfiguredRole } from '../types';
 import {
   setTaskCompletion,
   setTaskDueDate,
@@ -55,7 +55,8 @@ export async function executeTaskTransition(
   viewMode: ViewMode,
   mutator: TaskMutator,
   todayStr: string,
-  roleTag?: RoleId | null
+  roleTag?: RoleId | null,
+  configuredRoles?: ConfiguredRole[]
 ): Promise<boolean> {
   const needsRoleUpdate = roleTag !== undefined && task.effectiveRole !== (roleTag || 'untagged');
 
@@ -63,7 +64,7 @@ export async function executeTaskTransition(
     let updated = line;
 
     if (needsRoleUpdate) {
-      updated = setTaskRole(updated, roleTag || null);
+      updated = setTaskRole(updated, roleTag || null, configuredRoles);
     }
 
     if (viewMode === 'gtd') {

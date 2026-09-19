@@ -21,6 +21,9 @@ describe('Role Tag Mutation & Extraction', () => {
     expect(extractRoleFromPath('Roles/Yo Manager/Projects/App.md')).toBe('role/yo-manager');
     expect(extractRoleFromPath('Roles/Josef Self-Care/Projects/Health.md')).toBe('role/josef-selfcare');
     expect(extractRoleFromPath('Roles/RJ Supportive/Projects/Family.md')).toBe('role/rj-supportive');
+    expect(extractRoleFromPath('00 Identity/Yo the Manager/Projects/App.md')).toBe('role/yo-manager');
+    expect(extractRoleFromPath('00 Identity/Josef with Self Care/Projects/Health.md')).toBe('role/josef-selfcare');
+    expect(extractRoleFromPath('00 Identity/RJ the Supportive/Projects/Family.md')).toBe('role/rj-supportive');
     expect(extractRoleFromPath('References/Topics/Finance.md')).toBeNull();
   });
 
@@ -30,11 +33,11 @@ describe('Role Tag Mutation & Extraction', () => {
     // Switch to Josef Self-Care
     const switched = setTaskRole(line, 'role/josef-selfcare');
     expect(switched).not.toContain('#role/yo-manager');
-    expect(switched).toContain('#role/josef-selfcare');
+    expect(switched).toContain('[[Josef with Self Care]]');
 
     // Strip role (untagged)
     const stripped = setTaskRole(switched, 'untagged');
-    expect(stripped).not.toContain('#role/josef-selfcare');
+    expect(stripped).not.toContain('[[Josef with Self Care]]');
     expect(stripped).not.toContain('#role/');
     expect(stripped).toBe('- [ ] Fix production bug ⏳ 2026-09-20');
   });
@@ -47,9 +50,9 @@ describe('Role Tag Mutation & Extraction', () => {
   });
 
   it('formats role labels in clean Title Case', () => {
-    expect(formatRoleLabel('role/yo-manager')).toBe('Yo Manager');
-    expect(formatRoleLabel('role/josef-selfcare')).toBe('Josef Self-Care');
-    expect(formatRoleLabel('role/rj-supportive')).toBe('RJ Supportive');
+    expect(formatRoleLabel('role/yo-manager')).toBe('Yo the Manager');
+    expect(formatRoleLabel('role/josef-selfcare')).toBe('Josef with Self Care');
+    expect(formatRoleLabel('role/rj-supportive')).toBe('RJ the Supportive');
     expect(formatRoleLabel('deep-work')).toBe('Deep Work');
     expect(formatRoleLabel('#roles/client-project')).toBe('Client Project');
   });

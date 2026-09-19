@@ -330,14 +330,31 @@ export function formatRoleLabel(tag: string): string {
   clean = clean.replace(/^(roles?\/)/i, '');
   const lower = clean.toLowerCase();
   if (
+    lower === 'yo-manager' ||
+    lower === 'yo manager' ||
+    lower === 'yo the manager' ||
+    lower === 'yo_manager'
+  ) {
+    return 'Yo the Manager';
+  }
+  if (
     lower === 'josef-selfcare' ||
     lower === 'josef-self-care' ||
-    lower === 'josefselfcare'
+    lower === 'josefselfcare' ||
+    lower === 'josef self-care' ||
+    lower === 'josef with self care' ||
+    lower === 'josef_selfcare'
   ) {
-    return 'Josef Self-Care';
+    return 'Josef with Self Care';
   }
-  if (lower === 'rj-supportive' || lower === 'rjsupportive') {
-    return 'RJ Supportive';
+  if (
+    lower === 'rj-supportive' ||
+    lower === 'rjsupportive' ||
+    lower === 'rj supportive' ||
+    lower === 'rj the supportive' ||
+    lower === 'rj_supportive'
+  ) {
+    return 'RJ the Supportive';
   }
   clean = clean.replace(/[-_/]+/g, ' ').trim();
   return clean
@@ -350,9 +367,9 @@ export function formatRoleLabel(tag: string): string {
 }
 
 export const DEFAULT_ROLE_DEFS: ConfiguredRole[] = [
-  { id: 'role/yo-manager', label: 'Yo Manager', tag: 'role/yo-manager' },
-  { id: 'role/josef-selfcare', label: 'Josef Self-Care', tag: 'role/josef-selfcare' },
-  { id: 'role/rj-supportive', label: 'RJ Supportive', tag: 'role/rj-supportive' }
+  { id: 'role/yo-manager', label: 'Yo the Manager', tag: 'role/yo-manager' },
+  { id: 'role/josef-selfcare', label: 'Josef with Self Care', tag: 'role/josef-selfcare' },
+  { id: 'role/rj-supportive', label: 'RJ the Supportive', tag: 'role/rj-supportive' }
 ];
 
 export function parseConfiguredRoles(csv?: string): ConfiguredRole[] {
@@ -420,16 +437,66 @@ export function extractRoleFromTags(tags: string[], configuredRoles?: Configured
       if (!cleanTag.startsWith('role/') && `role/${cleanTag}` === r.id) return r.id;
       const hypLabel = r.label.toLowerCase().replace(/\s+/g, '-');
       if (cleanTag === hypLabel || cleanTag === `role/${hypLabel}`) return r.id;
+      if (r.id === 'role/yo-manager') {
+        if (
+          cleanTag === 'role/yo-manager' ||
+          cleanTag === 'yo-manager' ||
+          cleanTag === 'role/yo-the-manager' ||
+          cleanTag === 'yo-the-manager' ||
+          cleanTag === 'yo the manager'
+        ) {
+          return 'role/yo-manager';
+        }
+      }
       if (r.id === 'role/josef-selfcare') {
         if (
           cleanTag === 'role/josef-selfcare' ||
           cleanTag === 'josef-selfcare' ||
           cleanTag === 'role/josef-self-care' ||
-          cleanTag === 'josef-self-care'
+          cleanTag === 'josef-self-care' ||
+          cleanTag === 'role/josef-with-self-care' ||
+          cleanTag === 'josef with self care'
         ) {
           return 'role/josef-selfcare';
         }
       }
+      if (r.id === 'role/rj-supportive') {
+        if (
+          cleanTag === 'role/rj-supportive' ||
+          cleanTag === 'rj-supportive' ||
+          cleanTag === 'role/rj-the-supportive' ||
+          cleanTag === 'rj the supportive'
+        ) {
+          return 'role/rj-supportive';
+        }
+      }
+    }
+  }
+  return null;
+}
+
+export function extractRoleFromIdentities(identities: unknown, configuredRoles?: ConfiguredRole[]): RoleId | null {
+  if (!identities) return null;
+  const roles = configuredRoles && configuredRoles.length > 0 ? configuredRoles : DEFAULT_ROLE_DEFS;
+  const list: string[] = Array.isArray(identities)
+    ? identities.map(String)
+    : typeof identities === 'string'
+    ? [identities]
+    : [];
+
+  for (const item of list) {
+    const clean = item.replace(/\[\[|\]\]/g, '').replace(/\|.*$/, '').trim().toLowerCase();
+    if (!clean) continue;
+    for (const r of roles) {
+      if (clean === r.id.toLowerCase()) return r.id;
+      if (clean === r.label.toLowerCase()) return r.id;
+      if (clean === r.tag.toLowerCase()) return r.id;
+      if (r.id.startsWith('role/') && clean === r.id.slice(5).toLowerCase()) return r.id;
+      const formatted = formatRoleLabel(clean);
+      if (formatted.toLowerCase() === r.label.toLowerCase()) return r.id;
+      if (r.id === 'role/yo-manager' && (clean === 'yo the manager' || clean === 'yo manager' || clean === 'yo-manager')) return r.id;
+      if (r.id === 'role/josef-selfcare' && (clean === 'josef with self care' || clean === 'josef self-care' || clean === 'josef-selfcare')) return r.id;
+      if (r.id === 'role/rj-supportive' && (clean === 'rj the supportive' || clean === 'rj supportive' || clean === 'rj-supportive')) return r.id;
     }
   }
   return null;
@@ -439,22 +506,57 @@ export function extractRoleFromPath(filePath: string, configuredRoles?: Configur
   const norm = filePath.replace(/\\/g, '/');
   const roles = configuredRoles && configuredRoles.length > 0 ? configuredRoles : DEFAULT_ROLE_DEFS;
   for (const r of roles) {
-    if (norm.startsWith(`Roles/${r.label}/`) || norm.includes(`/${r.label}/`)) return r.id;
+    if (norm.includes(`00 Identity/${r.label}/`) || norm.includes(`/${r.label}/`)) return r.id;
+    if (norm.startsWith(`Roles/${r.label}/`)) return r.id;
     if (r.tag.startsWith('role/')) {
       const raw = r.tag.slice(5);
       if (norm.includes(`/${raw}/`)) return r.id;
     }
     if (norm.includes(`/${r.tag}/`)) return r.id;
+
+    if (r.id === 'role/yo-manager' && (norm.includes('Yo the Manager') || norm.includes('Yo Manager'))) return r.id;
+    if (r.id === 'role/josef-selfcare' && (norm.includes('Josef with Self Care') || norm.includes('Josef Self-Care') || norm.includes('Josef-Selfcare'))) return r.id;
+    if (r.id === 'role/rj-supportive' && (norm.includes('RJ the Supportive') || norm.includes('RJ Supportive') || norm.includes('RJ-Supportive'))) return r.id;
   }
   return null;
 }
 
-export function setTaskRole(line: string, newRole: RoleId | null): string {
-  const clean = line.replace(ROLE_TAG_REGEX, '').replace(/[ \t]{2,}/g, ' ').trimEnd();
+export function setTaskRole(line: string, newRole: RoleId | null, configuredRoles?: ConfiguredRole[]): string {
+  const roles = configuredRoles && configuredRoles.length > 0 ? configuredRoles : DEFAULT_ROLE_DEFS;
+
+  // 1. Strip legacy #role/... tags
+  let clean = line.replace(ROLE_TAG_REGEX, '');
+
+  // 2. Identify if an existing identity wikilink exists
+  let replaced = false;
+  const roleDef = newRole && newRole !== 'untagged'
+    ? (roles.find((r) => r.id === newRole || r.tag === newRole) ?? { label: formatRoleLabel(newRole) })
+    : null;
+  const newIdentityLink = roleDef ? `[[${roleDef.label}]]` : '';
+
+  clean = clean.replace(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, (match, noteName) => {
+    const roleId = extractRoleFromIdentities([noteName], roles);
+    if (roleId) {
+      if (!replaced && newIdentityLink) {
+        replaced = true;
+        return newIdentityLink;
+      }
+      return '';
+    }
+    return match;
+  });
+
+  clean = clean.replace(/[ \t]{2,}/g, ' ').trimEnd();
+
   if (!newRole || newRole === 'untagged') {
     return clean;
   }
-  return `${clean} #${newRole}`;
+
+  if (!replaced && newIdentityLink) {
+    return `${clean} ${newIdentityLink}`;
+  }
+
+  return clean;
 }
 
 

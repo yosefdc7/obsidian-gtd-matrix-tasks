@@ -195,7 +195,7 @@ describe('Role folding into the same single write', () => {
       roleTag: 'role/josef-selfcare',
       overrides: { effectiveRole: 'role/yo-manager' }
     });
-    expect(output).toBe('- [ ] Foo #role/josef-selfcare 📅 2026-09-18');
+    expect(output).toBe('- [ ] Foo [[Josef with Self Care]] 📅 2026-09-18');
     expect(callCount).toBe(1);
   });
 
@@ -230,7 +230,7 @@ describe('Role folding into the same single write', () => {
       roleTag: 'role/rj-supportive',
       overrides: { effectiveRole: 'untagged' }
     });
-    expect(output).toBe('- [ ] Foo #role/rj-supportive 🔼');
+    expect(output).toBe('- [ ] Foo [[RJ the Supportive]] 🔼');
     expect(callCount).toBe(1);
   });
 });

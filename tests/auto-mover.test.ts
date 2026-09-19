@@ -32,24 +32,31 @@ describe('AutoMover Classification & Routing', () => {
   });
 
   describe('Role + Project Routing', () => {
-    it('routes #project + #role/yo-manager to Roles/Yo Manager/Projects', () => {
+    it('routes #project + #role/yo-manager to 00 Identity/Yo the Manager/Projects', () => {
       const dest = determineDestinationFolder('References/Topics/New Project.md', ['project', 'role/yo-manager']);
-      expect(dest).toBe('Roles/Yo Manager/Projects');
+      expect(dest).toBe('00 Identity/Yo the Manager/Projects');
     });
 
-    it('routes #project + #role/josef-selfcare to Roles/Josef Self-Care/Projects', () => {
+    it('routes #project + #role/josef-selfcare to 00 Identity/Josef with Self Care/Projects', () => {
       const dest = determineDestinationFolder('References/Topics/Fitness App.md', ['project', 'role/josef-selfcare']);
-      expect(dest).toBe('Roles/Josef Self-Care/Projects');
+      expect(dest).toBe('00 Identity/Josef with Self Care/Projects');
     });
 
-    it('routes #project + #role/rj-supportive to Roles/RJ Supportive/Projects', () => {
+    it('routes #project + #role/rj-supportive to 00 Identity/RJ the Supportive/Projects', () => {
       const dest = determineDestinationFolder('References/Topics/House Renovation.md', ['project', 'role/rj-supportive']);
-      expect(dest).toBe('Roles/RJ Supportive/Projects');
+      expect(dest).toBe('00 Identity/RJ the Supportive/Projects');
     });
 
     it('supports frontmatter type: project', () => {
       const dest = determineDestinationFolder('References/Topics/Special Doc.md', ['role/yo-manager'], { type: 'project' });
-      expect(dest).toBe('Roles/Yo Manager/Projects');
+      expect(dest).toBe('00 Identity/Yo the Manager/Projects');
+    });
+
+    it('routes project by frontmatter identities without #role tags', () => {
+      const dest = determineDestinationFolder('References/Topics/Tagless Project.md', ['project'], {
+        identities: ['[[Yo the Manager]]']
+      });
+      expect(dest).toBe('00 Identity/Yo the Manager/Projects');
     });
   });
 

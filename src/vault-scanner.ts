@@ -1,5 +1,5 @@
 import { App, TFile, normalizePath } from 'obsidian';
-import { TaskItem, TaskPriority, SectionId, PluginSettings, RoleId } from './types';
+import { TaskItem, TaskPriority, SectionId, PluginSettings, RoleId, ConfiguredRole } from './types';
 import { TaskStore } from './store/task-store';
 import { RoleResolver, ResolvedRole } from './store/role-resolver';
 import { ScanEngine } from './store/scan-engine';
@@ -13,8 +13,10 @@ export class VaultScanner {
   public mutator: TaskMutator;
   public debouncedScan: () => void;
   public debouncedNotify: () => void;
+  private app: App;
 
   constructor(app: App, settings: PluginSettings) {
+    this.app = app;
     this.store = new TaskStore();
     const configDir = app.vault.configDir || '.obsidian';
     const cachePath = normalizePath(`${configDir}/plugins/gtd-matrix-tasks/task-cache.json`);
@@ -118,8 +120,8 @@ export class VaultScanner {
     return this.mutator.setSomeday(task, someday);
   }
 
-  public async setRole(task: TaskItem, newRole: RoleId | null): Promise<boolean> {
-    return this.mutator.setRole(task, newRole);
+  public async setRole(task: TaskItem, newRole: RoleId | null, configuredRoles?: ConfiguredRole[]): Promise<boolean> {
+    return this.mutator.setRole(task, newRole, configuredRoles ?? this.roleResolver.getConfiguredRoles());
   }
 
   public async quickAddTask(sectionId: SectionId, text: string, role?: RoleId | null): Promise<boolean> {

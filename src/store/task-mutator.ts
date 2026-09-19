@@ -1,5 +1,5 @@
 import { App, TFile } from 'obsidian';
-import { DateAnchorField, TaskItem, TaskPriority, SectionId, PluginSettings, RoleId } from '../types';
+import { DateAnchorField, TaskItem, TaskPriority, SectionId, PluginSettings, RoleId, ConfiguredRole } from '../types';
 import type { ParsedInput } from '../nl-input';
 import {
   setTaskPriority,
@@ -144,9 +144,9 @@ export class TaskMutator {
     );
   }
 
-  public async setRole(task: TaskItem, newRole: RoleId | null): Promise<boolean> {
+  public async setRole(task: TaskItem, newRole: RoleId | null, configuredRoles?: ConfiguredRole[]): Promise<boolean> {
     return this.updateTaskLine(task.filePath, task.lineNumber, task.rawText, (line) =>
-      setTaskRole(line, newRole)
+      setTaskRole(line, newRole, configuredRoles)
     );
   }
 
