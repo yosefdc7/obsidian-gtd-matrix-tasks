@@ -239,20 +239,7 @@
   flex-shrink: 0;
 }
 
-/* Anchor Switcher ([Start] [Scheduled] [Due]) */
-.gtd-anchor-switcher {
-  display: inline-flex;
-  border-radius: 6px;
-  padding: 1px !important;
-  gap: 1px;
-}
 
-.gtd-anchor-switcher .gtd-mode-btn {
-  padding: 3px 8px !important;
-  font-size: 11px !important;
-  min-height: 24px !important;
-  border-radius: 5px !important;
-}
 
 .gtd-stats-pill {
   font-size: 0.85em;
@@ -320,6 +307,37 @@
 }
 
 .gtd-search-toggle-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.gtd-anchor-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.gtd-anchor-toggle-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.gtd-anchor-toggle-btn:active {
+  color: var(--text-accent);
+  border-color: var(--interactive-accent);
+  background-color: rgba(var(--interactive-accent-rgb), 0.1);
+}
+
+.gtd-anchor-toggle-btn svg {
   width: 16px;
   height: 16px;
 }
@@ -2102,6 +2120,13 @@
     flex-shrink: 0;
   }
 
+  .gtd-anchor-toggle-btn {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    padding: 0 !important;
+  }
+
   .gtd-search-toggle-btn {
     display: inline-flex;
     width: 36px;
@@ -2113,22 +2138,6 @@
     width: 36px;
     height: 36px;
     padding: 0 !important;
-  }
-
-  /* By Date anchor switcher as compact sub-row on mobile */
-  .gtd-anchor-switcher {
-    width: 100%;
-    order: 4;
-    margin-top: 4px;
-    display: flex;
-  }
-
-  .gtd-anchor-switcher .gtd-mode-btn {
-    flex: 1;
-    text-align: center;
-    padding: 5px 8px;
-    min-height: 32px;
-    font-size: 0.8em;
   }
 
   /* Expandable mobile search row */

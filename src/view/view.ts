@@ -37,7 +37,7 @@ export class GTDMatrixView extends ItemView {
       layoutMode: 'board',
       sortCriteria: 'date',
       tagViewMode: 'filter',
-      dateAnchor: 'scheduled',
+      dateAnchor: 'start',
       activeFilterRoles: new Set<RoleId>([
         'role/yo-manager',
         'role/josef-selfcare',
@@ -48,7 +48,7 @@ export class GTDMatrixView extends ItemView {
       searchQuery: '',
       activeChip: 'all',
       selectedFolder: 'all',
-      collapsedSections: new Set<SectionId>(),
+      collapsedSections: new Set<string>(),
       optionsOpen: false,
       mobileSearchOpen: false
     };
@@ -56,7 +56,7 @@ export class GTDMatrixView extends ItemView {
     if (settings) {
       this.viewState.layoutMode = settings.defaultLayoutMode;
       this.viewState.viewMode = settings.defaultViewMode || 'date';
-      this.viewState.dateAnchor = settings.defaultDateAnchor || 'scheduled';
+      this.viewState.dateAnchor = settings.defaultDateAnchor || 'start';
       this.viewState.sortCriteria = settings.defaultSortCriteria || 'date';
       this.viewState.tagViewMode = settings.defaultTagViewMode || 'filter';
       if (settings.activeFilterRoles && settings.activeFilterRoles.length > 0) {

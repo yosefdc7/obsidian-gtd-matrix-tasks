@@ -106,7 +106,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   autoAddCreatedDate: false,
   defaultDailyNoteFolder: 'Jots',
   defaultViewMode: 'date',
-  defaultDateAnchor: 'scheduled',
+  defaultDateAnchor: 'start',
   defaultLayoutMode: 'board',
   defaultSortCriteria: 'date',
   defaultTagViewMode: 'filter',

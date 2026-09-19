@@ -1,4 +1,4 @@
-import { setIcon } from 'obsidian';
+import { Menu, setIcon } from 'obsidian';
 import { parseConfiguredRoles, getRoleColor } from '../parser';
 import type { ViewContext } from './types';
 import type { DateAnchorField, RoleId, SortCriteria, TaskItem } from '../types';
@@ -95,30 +95,76 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
     }
   });
 
-  // Anchor field selector (By Date only); session-only, defaults to Scheduled
-  if (state.viewMode === 'date') {
-    const anchorGroup = tabRow.createDiv({ cls: 'gtd-mode-switcher gtd-anchor-switcher' });
-    const anchors: { id: DateAnchorField; label: string }[] = [
-      { id: 'start', label: 'Start' },
-      { id: 'scheduled', label: 'Scheduled' },
-      { id: 'due', label: 'Due' }
-    ];
-    for (const anchor of anchors) {
-      const anchorBtn = anchorGroup.createEl('button', {
-        cls: `gtd-mode-btn ${state.dateAnchor === anchor.id ? 'is-active' : ''}`,
-        text: anchor.label
-      });
-      anchorBtn.title = `Position tasks by their ${anchor.label.toLowerCase()} date`;
-      anchorBtn.addEventListener('click', () => {
-        if (ctx.getState().dateAnchor !== anchor.id) {
-          ctx.setState({ dateAnchor: anchor.id });
-        }
-      });
-    }
-  }
-
-  // Action buttons: [🔍 Search toggle (mobile)] [⚙ Options toggle]
+  // Action buttons: [🛫 Anchor toggle (By Date)] [🔍 Search toggle (mobile)] [⚙ Options toggle]
   const actionsWrap = tabRow.createDiv({ cls: 'gtd-tab-actions' });
+
+  // Anchor field selector icon button (By Date only)
+  if (state.viewMode === 'date') {
+    const currentAnchor = state.dateAnchor || 'start';
+    const anchorIcon =
+      currentAnchor === 'start'
+        ? 'plane-takeoff'
+        : currentAnchor === 'scheduled'
+        ? 'hourglass'
+        : 'calendar';
+
+    const anchorLabel =
+      currentAnchor === 'start'
+        ? 'Start Date'
+        : currentAnchor === 'scheduled'
+        ? 'Scheduled Date'
+        : 'Due Date';
+
+    const anchorToggle = actionsWrap.createEl('button', {
+      cls: 'gtd-anchor-toggle-btn',
+      attr: { 'aria-label': `Anchor: ${anchorLabel} (tap to change)` }
+    });
+    setIcon(anchorToggle, anchorIcon);
+    anchorToggle.title = `Anchor: ${anchorLabel} (tap to change)`;
+
+    anchorToggle.addEventListener('click', (e: MouseEvent) => {
+      e.stopPropagation();
+      const menu = new Menu();
+
+      menu.addItem((item) => {
+        item
+          .setTitle('Start Date')
+          .setIcon('plane-takeoff')
+          .setChecked(currentAnchor === 'start')
+          .onClick(() => {
+            if (ctx.getState().dateAnchor !== 'start') {
+              ctx.setState({ dateAnchor: 'start' });
+            }
+          });
+      });
+
+      menu.addItem((item) => {
+        item
+          .setTitle('Scheduled Date')
+          .setIcon('hourglass')
+          .setChecked(currentAnchor === 'scheduled')
+          .onClick(() => {
+            if (ctx.getState().dateAnchor !== 'scheduled') {
+              ctx.setState({ dateAnchor: 'scheduled' });
+            }
+          });
+      });
+
+      menu.addItem((item) => {
+        item
+          .setTitle('Due Date')
+          .setIcon('calendar')
+          .setChecked(currentAnchor === 'due')
+          .onClick(() => {
+            if (ctx.getState().dateAnchor !== 'due') {
+              ctx.setState({ dateAnchor: 'due' });
+            }
+          });
+      });
+
+      menu.showAtMouseEvent(e);
+    });
+  }
 
   // Mobile search toggle button
   const isSearchActive = Boolean(state.mobileSearchOpen || state.searchQuery);

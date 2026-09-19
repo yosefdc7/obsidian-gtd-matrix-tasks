@@ -197,7 +197,7 @@ export interface ViewState {
   searchQuery: string;
   activeChip: QuickFilterChip;
   selectedFolder: string;
-  collapsedSections: Set<SectionId>;
+  collapsedSections: Set<string>;
   /** Options disclosure (sort/folder/chips); session-only, default false. */
   optionsOpen: boolean;
   /** Expandable mobile search bar toggle; session-only, default false. */

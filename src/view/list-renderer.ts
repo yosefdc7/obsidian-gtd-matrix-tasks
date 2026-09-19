@@ -191,11 +191,18 @@ function renderDateSection(
   tasks: TaskItem[],
   ctx: ViewContext
 ): void {
-  const sectionEl = container.createDiv({ cls: `gtd-section ${bucket.badgeClass}` });
+  const isCollapsed = ctx.getState().collapsedSections.has(bucket.id);
+  const sectionEl = container.createDiv({
+    cls: `gtd-section ${bucket.badgeClass} ${isCollapsed ? 'collapsed' : ''}`
+  });
 
-  // Header (static bucket icon; no collapse in By Date)
+  // Header: toggle chevron + bucket icon + short title + count
   const headerEl = sectionEl.createDiv({ cls: 'gtd-section-header' });
   headerEl.title = `${bucket.title}\n${bucket.subtitle}`;
+
+  const toggleIcon = headerEl.createSpan({ cls: 'gtd-toggle-icon' });
+  setIcon(toggleIcon, 'chevron-down');
+
   const iconSpan = headerEl.createSpan({ cls: 'gtd-bucket-icon' });
   setIcon(iconSpan, bucket.icon);
 
@@ -205,6 +212,17 @@ function renderDateSection(
     text: bucket.title.split('—')[0].trim()
   });
   titleGroup.createSpan({ cls: 'gtd-count-badge', text: String(tasks.length) });
+
+  headerEl.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+    const collapsed = new Set(ctx.getState().collapsedSections);
+    if (collapsed.has(bucket.id)) {
+      collapsed.delete(bucket.id);
+    } else {
+      collapsed.add(bucket.id);
+    }
+    ctx.setState({ collapsedSections: collapsed });
+  });
 
   // Drop handling: day buckets accept drops (scheduling gesture); others reject
   if (bucket.dayDate) {
@@ -236,20 +254,22 @@ function renderDateSection(
   }
 
   // Body (tasks arrive pre-sorted from grouping)
-  const bodyEl = sectionEl.createDiv({ cls: 'gtd-section-body' });
+  if (!isCollapsed) {
+    const bodyEl = sectionEl.createDiv({ cls: 'gtd-section-body' });
 
-  if (tasks.length === 0) {
-    bodyEl.createDiv({
-      cls: 'gtd-empty-state',
-      text: 'No tasks here.'
-    });
-  } else {
-    for (const task of tasks) {
-      renderTaskItem(bodyEl, task, ctx);
+    if (tasks.length === 0) {
+      bodyEl.createDiv({
+        cls: 'gtd-empty-state',
+        text: 'No tasks here.'
+      });
+    } else {
+      for (const task of tasks) {
+        renderTaskItem(bodyEl, task, ctx);
+      }
     }
-  }
 
-  if (bucket.dayDate) {
-    renderDateQuickAddRow(bodyEl, bucket.dayDate, ctx);
+    if (bucket.dayDate) {
+      renderDateQuickAddRow(bodyEl, bucket.dayDate, ctx);
+    }
   }
 }
