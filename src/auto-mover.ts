@@ -9,8 +9,8 @@ export function normalizePath(path: string): string {
 }
 
 export const EXCLUDED_PREFIXES = [
-  'System/Templates/',
-  'System/Tests/',
+  '00 Identity/',
+  'System/',
   'References/Templates/',
   'References/System/',
   'zArchive/',
@@ -18,7 +18,7 @@ export const EXCLUDED_PREFIXES = [
 ];
 
 export const AREA_TAG_MAP: Record<string, string[]> = {
-  'References/Topics/Trading & Finance': [
+  '00 Identity/Josef with Self Care/Trading & Finance': [
     'finance',
     'trading',
     'crypto',
@@ -29,7 +29,7 @@ export const AREA_TAG_MAP: Record<string, string[]> = {
     'investment',
     'investments'
   ],
-  'References/Topics/Health & Fitness': [
+  '00 Identity/Josef with Self Care/Health & Fitness': [
     'health',
     'fitness',
     'habits',
@@ -43,7 +43,7 @@ export const AREA_TAG_MAP: Record<string, string[]> = {
     'skincare',
     'skin'
   ],
-  'References/Topics/Agile & Delivery': [
+  '00 Identity/Yo the Manager/Agile & Delivery': [
     'agile',
     'scrum',
     'delivery',
@@ -53,7 +53,7 @@ export const AREA_TAG_MAP: Record<string, string[]> = {
     'product',
     'roadmap'
   ],
-  'References/Topics/Admin & Life': [
+  '00 Identity/RJ the Supportive/Admin & Life': [
     'admin',
     'tax',
     'taxes',
@@ -62,7 +62,7 @@ export const AREA_TAG_MAP: Record<string, string[]> = {
     'home',
     'government'
   ],
-  'References/Topics/System & PKM': [
+  '00 Identity/Josef with Self Care/System & PKM': [
     'system',
     'pkm',
     'obsidian',

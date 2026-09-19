@@ -62,30 +62,30 @@ describe('AutoMover Classification & Routing', () => {
 
   describe('PARA Area Routing', () => {
     it('routes Trading & Finance tags', () => {
-      expect(determineDestinationFolder('References/Topics/Coin.md', ['crypto'])).toBe('References/Topics/Trading & Finance');
-      expect(determineDestinationFolder('References/Topics/Option.md', ['trading'])).toBe('References/Topics/Trading & Finance');
-      expect(determineDestinationFolder('References/Topics/Account.md', ['finance'])).toBe('References/Topics/Trading & Finance');
+      expect(determineDestinationFolder('References/Topics/Coin.md', ['crypto'])).toBe('00 Identity/Josef with Self Care/Trading & Finance');
+      expect(determineDestinationFolder('References/Topics/Option.md', ['trading'])).toBe('00 Identity/Josef with Self Care/Trading & Finance');
+      expect(determineDestinationFolder('References/Topics/Account.md', ['finance'])).toBe('00 Identity/Josef with Self Care/Trading & Finance');
     });
 
     it('routes Health & Fitness tags', () => {
-      expect(determineDestinationFolder('References/Topics/Jogging.md', ['fitness'])).toBe('References/Topics/Health & Fitness');
-      expect(determineDestinationFolder('References/Topics/Sleep.md', ['health'])).toBe('References/Topics/Health & Fitness');
-      expect(determineDestinationFolder('References/Topics/Morning.md', ['habits'])).toBe('References/Topics/Health & Fitness');
+      expect(determineDestinationFolder('References/Topics/Jogging.md', ['fitness'])).toBe('00 Identity/Josef with Self Care/Health & Fitness');
+      expect(determineDestinationFolder('References/Topics/Sleep.md', ['health'])).toBe('00 Identity/Josef with Self Care/Health & Fitness');
+      expect(determineDestinationFolder('References/Topics/Morning.md', ['habits'])).toBe('00 Identity/Josef with Self Care/Health & Fitness');
     });
 
     it('routes Agile & Delivery tags', () => {
-      expect(determineDestinationFolder('References/Topics/Standup.md', ['scrum'])).toBe('References/Topics/Agile & Delivery');
-      expect(determineDestinationFolder('References/Topics/Release.md', ['delivery'])).toBe('References/Topics/Agile & Delivery');
+      expect(determineDestinationFolder('References/Topics/Standup.md', ['scrum'])).toBe('00 Identity/Yo the Manager/Agile & Delivery');
+      expect(determineDestinationFolder('References/Topics/Release.md', ['delivery'])).toBe('00 Identity/Yo the Manager/Agile & Delivery');
     });
 
     it('routes Admin & Life tags', () => {
-      expect(determineDestinationFolder('References/Topics/BIR.md', ['tax'])).toBe('References/Topics/Admin & Life');
-      expect(determineDestinationFolder('References/Topics/Contract.md', ['admin'])).toBe('References/Topics/Admin & Life');
+      expect(determineDestinationFolder('References/Topics/BIR.md', ['tax'])).toBe('00 Identity/RJ the Supportive/Admin & Life');
+      expect(determineDestinationFolder('References/Topics/Contract.md', ['admin'])).toBe('00 Identity/RJ the Supportive/Admin & Life');
     });
 
     it('routes System & PKM tags', () => {
-      expect(determineDestinationFolder('References/Topics/Hotkeys.md', ['obsidian'])).toBe('References/Topics/System & PKM');
-      expect(determineDestinationFolder('References/Topics/PKM Design.md', ['pkm'])).toBe('References/Topics/System & PKM');
+      expect(determineDestinationFolder('References/Topics/Hotkeys.md', ['obsidian'])).toBe('00 Identity/Josef with Self Care/System & PKM');
+      expect(determineDestinationFolder('References/Topics/PKM Design.md', ['pkm'])).toBe('00 Identity/Josef with Self Care/System & PKM');
     });
   });
 
@@ -108,8 +108,10 @@ describe('AutoMover Classification & Routing', () => {
   });
 
   describe('Excluded Paths', () => {
-    it('never moves templates, archives, or system notes', () => {
-      expect(determineDestinationFolder('References/Templates/Project Note.md', ['project', 'role/yo-manager'])).toBeNull();
+    it('never moves templates, archives, system, or 00 Identity notes', () => {
+      expect(determineDestinationFolder('00 Identity/Josef with Self Care/Health & Fitness/Anxiety.md', ['health'])).toBeNull();
+      expect(determineDestinationFolder('System/Templates/Goal Note.md', ['goal'])).toBeNull();
+      expect(determineDestinationFolder('System/Templates/Project Note.md', ['project', 'role/yo-manager'])).toBeNull();
       expect(determineDestinationFolder('zArchive/Old Note.md', ['finance'])).toBeNull();
       expect(determineDestinationFolder('References/System/Settings.md', ['system'])).toBeNull();
     });
