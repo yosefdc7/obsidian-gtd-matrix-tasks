@@ -1,8 +1,8 @@
 {
   "id": "gtd-matrix-tasks",
   "name": "GTD Matrix Tasks",
-  "version": "1.0.5",
-  "minAppVersion": "1.4.0",
+  "version": "1.1.0",
+  "minAppVersion": "1.11.4",
   "description": "Interactive, drag-and-drop GTD & Eisenhower Matrix task list view with in-place editing for Obsidian.",
   "author": "Josef dela Cuesta",
   "isDesktopOnly": false

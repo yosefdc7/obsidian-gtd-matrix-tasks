@@ -15,6 +15,15 @@ import {
 import { TaskItem } from '../src/types';
 
 describe('Task Parser', () => {
+  it('hides UUID metadata from the description and preserves it when renaming', () => {
+    const line = '- [ ] Buy milk 🛫 2026-09-22 <!-- {"uuid":"123e4567-e89b-12d3-a456-426614174000"} -->';
+    const parsed = parseTaskLine(line, 'note.md', 0);
+    expect(parsed?.description).toBe('Buy milk');
+    expect(setTaskDescription(line, 'Buy oat milk')).toBe(
+      '- [ ] Buy oat milk 🛫 2026-09-22 <!-- {"uuid":"123e4567-e89b-12d3-a456-426614174000"} -->'
+    );
+  });
+
   it('parses a basic task with no metadata', () => {
     const line = '- [ ] Buy groceries';
     const task = parseTaskLine(line, 'test.md', 0);

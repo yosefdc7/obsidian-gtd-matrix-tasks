@@ -1,10 +1,11 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, Notice, PluginSettingTab, SecretComponent, Setting } from 'obsidian';
 import type GTDMatrixPlugin from './main';
 import { ViewMode, LayoutMode, SortCriteria, TagViewMode, DateAnchorField } from './types';
 import { parseConfiguredRoles } from './parser';
 
 export class GTDMatrixSettingTab extends PluginSettingTab {
   plugin: GTDMatrixPlugin;
+  private calendarChoices: Array<{ id: string; summary: string; timeZone?: string }> = [];
 
   constructor(app: App, plugin: GTDMatrixPlugin) {
     super(app, plugin);
@@ -16,6 +17,135 @@ export class GTDMatrixSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     containerEl.createEl('h2', { text: 'GTD Matrix Tasks Settings' });
+
+    containerEl.createEl('h3', { text: 'Google Calendar sync' });
+
+    new Setting(containerEl)
+      .setName('Enable one-way calendar sync')
+      .setDesc('Projects open Start-dated tasks to the selected Google calendar. Obsidian remains the source of truth.')
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.calendarSyncEnabled)
+        .onChange(async (value) => {
+          this.plugin.settings.calendarSyncEnabled = value;
+          await this.plugin.saveSettings();
+          if (value) this.plugin.calendarSync.schedule(0);
+          this.display();
+        }));
+
+    new Setting(containerEl)
+      .setName('Google OAuth client ID')
+      .setDesc('Web OAuth client ID from your personal Google Cloud project.')
+      .addText((text) => text
+        .setPlaceholder('...apps.googleusercontent.com')
+        .setValue(this.plugin.settings.googleOAuthClientId)
+        .onChange(async (value) => {
+          this.plugin.settings.googleOAuthClientId = value.trim();
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Google OAuth client secret')
+      .setDesc('Stored in Obsidian Secret Storage on this device, never in plugin data or the vault.')
+      .addComponent((el) => new SecretComponent(this.app, el)
+        .setValue(this.plugin.settings.googleOAuthClientSecretId)
+        .onChange(async (value) => {
+          this.plugin.settings.googleOAuthClientSecretId = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Apps Script callback URL')
+      .setDesc('HTTPS deployment URL from the included Google Apps Script callback.')
+      .addText((text) => text
+        .setPlaceholder('https://script.google.com/macros/s/.../exec')
+        .setValue(this.plugin.settings.googleOAuthRedirectUri)
+        .onChange(async (value) => {
+          this.plugin.settings.googleOAuthRedirectUri = value.trim();
+          await this.plugin.saveSettings();
+        }));
+
+    const status = this.plugin.calendarSync?.getStatus();
+    new Setting(containerEl)
+      .setName('Google connection')
+      .setDesc(status?.lastError
+        ? `Error: ${status.lastError}`
+        : status?.lastSuccess
+          ? `Last successful sync: ${new Date(status.lastSuccess).toLocaleString()}`
+          : `Status: ${status?.state ?? 'not initialized'}`)
+      .addButton((button) => button
+        .setButtonText(this.plugin.calendarSync?.isConnected() ? 'Reconnect' : 'Connect Google Calendar')
+        .setCta()
+        .onClick(() => {
+          try { this.plugin.calendarSync.beginConnect(); }
+          catch (error) { new Notice(error instanceof Error ? error.message : String(error)); }
+        }))
+      .addButton((button) => button
+        .setButtonText('Sync now')
+        .onClick(async () => {
+          await this.plugin.calendarSync.syncNow(true);
+          this.display();
+        }));
+
+    const destination = new Setting(containerEl)
+      .setName('Destination calendar')
+      .setDesc('Only the currently selected calendar is managed. Old calendars are left untouched when you switch.');
+    destination.addDropdown((dropdown) => {
+      const choices = this.calendarChoices.length > 0
+        ? this.calendarChoices
+        : [{ id: this.plugin.settings.googleCalendarId || 'primary', summary: this.plugin.settings.googleCalendarName || 'Primary calendar' }];
+      for (const calendar of choices) dropdown.addOption(calendar.id, calendar.summary);
+      dropdown.setValue(this.plugin.settings.googleCalendarId || 'primary').onChange(async (value) => {
+        const selected = choices.find((calendar) => calendar.id === value);
+        this.plugin.settings.googleCalendarId = value;
+        this.plugin.settings.googleCalendarName = selected?.summary ?? value;
+        if (selected?.timeZone) this.plugin.settings.calendarTimeZone = selected.timeZone;
+        await this.plugin.saveSettings();
+        this.plugin.calendarSync.schedule(0);
+        this.display();
+      });
+    });
+    destination.addButton((button) => button.setButtonText('Load calendars').onClick(async () => {
+      try {
+        this.calendarChoices = await this.plugin.calendarSync.listWritableCalendars();
+        this.display();
+      } catch (error) {
+        new Notice(error instanceof Error ? error.message : String(error));
+      }
+    }));
+
+    new Setting(containerEl)
+      .setName('Default event start')
+      .setDesc('All task events may overlap at this fixed local calendar time.')
+      .addText((text) => text.setPlaceholder('07:00').setValue(this.plugin.settings.calendarDefaultStartTime).onChange(async (value) => {
+        if (/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+          this.plugin.settings.calendarDefaultStartTime = value;
+          await this.plugin.saveSettings();
+          this.plugin.calendarSync.schedule();
+        }
+      }));
+
+    new Setting(containerEl)
+      .setName('Default duration (minutes)')
+      .setDesc('Duration of every managed task event.')
+      .addText((text) => text.setPlaceholder('30').setValue(String(this.plugin.settings.calendarDefaultDurationMinutes)).onChange(async (value) => {
+        const minutes = Number.parseInt(value, 10);
+        if (minutes > 0 && minutes <= 1440) {
+          this.plugin.settings.calendarDefaultDurationMinutes = minutes;
+          await this.plugin.saveSettings();
+          this.plugin.calendarSync.schedule();
+        }
+      }));
+
+    new Setting(containerEl)
+      .setName('Calendar timezone')
+      .setDesc('Defaults from the selected Google calendar and remains stable while travelling.')
+      .addText((text) => text.setPlaceholder('Asia/Singapore').setValue(this.plugin.settings.calendarTimeZone).onChange(async (value) => {
+        this.plugin.settings.calendarTimeZone = value.trim() || 'Asia/Singapore';
+        await this.plugin.saveSettings();
+        this.plugin.calendarSync.schedule();
+      }));
+
+    containerEl.createEl('h3', { text: 'Task view' });
 
     new Setting(containerEl)
       .setName('Default view mode')

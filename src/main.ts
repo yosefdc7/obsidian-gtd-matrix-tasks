@@ -7,12 +7,14 @@ import { isDateTitledNote } from './date-utils';
 import { AutoMover } from './auto-mover';
 import { reconcileNoteContent, isWithinActiveWindow } from './context-linker';
 import { HoverManager } from './hover-manager';
+import { CalendarSyncController } from './calendar/controller';
 
 export default class GTDMatrixPlugin extends Plugin {
   public settings: PluginSettings = DEFAULT_SETTINGS;
   public scanner: VaultScanner = null!;
   public autoMover: AutoMover = null!;
   public hoverManager: HoverManager = null!;
+  public calendarSync: CalendarSyncController = null!;
   public lastActiveFile: TFile | null = null;
 
   async onload(): Promise<void> {
@@ -22,6 +24,16 @@ export default class GTDMatrixPlugin extends Plugin {
     await this.scanner.loadSnapshot();
     this.autoMover = new AutoMover(this.app, this.settings);
     this.hoverManager = new HoverManager(this.app, this.settings);
+    this.calendarSync = new CalendarSyncController(this.app, this.scanner, () => this.settings);
+    this.calendarSync.start();
+
+    this.registerObsidianProtocolHandler('gtd-calendar-auth', (params) => {
+      void this.calendarSync.handleOAuthCallback(params).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn('[GTD Calendar OAuth]', error);
+        new Notice(`Google Calendar connection failed: ${message}`);
+      });
+    });
 
     this.registerView(
       VIEW_TYPE_GTD_MATRIX,
@@ -60,6 +72,12 @@ export default class GTDMatrixPlugin extends Plugin {
       callback: () => {
         void this.reconcileActiveDailyJots(true);
       }
+    });
+
+    this.addCommand({
+      id: 'sync-google-calendar-now',
+      name: 'Sync Google Calendar now',
+      callback: () => void this.calendarSync.syncNow(true)
     });
 
     this.addSettingTab(new GTDMatrixSettingTab(this.app, this));
@@ -286,6 +304,7 @@ export default class GTDMatrixPlugin extends Plugin {
   }
 
   onunload(): void {
+    this.calendarSync?.stop();
     void this.scanner?.saveSnapshot();
     this.hoverManager?.destroy();
     this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {

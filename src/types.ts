@@ -95,6 +95,15 @@ export interface PluginSettings {
   enableLatestBacklinkHover: boolean;
   backlinkHoverDelayMs: number;
   backlinkHoverMaxChars: number;
+  calendarSyncEnabled: boolean;
+  googleOAuthClientId: string;
+  googleOAuthClientSecretId: string;
+  googleOAuthRedirectUri: string;
+  googleCalendarId: string;
+  googleCalendarName: string;
+  calendarDefaultStartTime: string;
+  calendarDefaultDurationMinutes: number;
+  calendarTimeZone: string;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -124,5 +133,14 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   enableLatestBacklinkHover: true,
   backlinkHoverDelayMs: 250,
   backlinkHoverMaxChars: 200,
+  calendarSyncEnabled: false,
+  googleOAuthClientId: '',
+  googleOAuthClientSecretId: 'gtd-google-oauth-client-secret',
+  googleOAuthRedirectUri: '',
+  googleCalendarId: 'primary',
+  googleCalendarName: 'Primary calendar',
+  calendarDefaultStartTime: '07:00',
+  calendarDefaultDurationMinutes: 30,
+  calendarTimeZone: 'Asia/Singapore',
 };
 

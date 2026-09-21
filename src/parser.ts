@@ -13,6 +13,7 @@ const SOMEDAY_REGEX = /#(someday|maybe)\b/i;
 const WAITING_REGEX = /#waiting\b|@waiting\b|\bwaiting on\b|#blocked\b|#on-hold\b|#onhold\b/i;
 const WIKILINK_REGEX = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]/g;
 const ROLE_TAG_REGEX = /#role\/[a-zA-Z0-9_-]+/g;
+const HIDDEN_COMMENT_REGEX = /<!--.*?-->/g;
 
 export function parseTaskLine(line: string, filePath: string, lineNumber: number): TaskItem | null {
   const match = line.match(TASK_REGEX);
@@ -84,6 +85,7 @@ export function parseTaskLine(line: string, filePath: string, lineNumber: number
     .replace(COMPLETED_DATE_REGEX, '')
     .replace(CREATED_DATE_REGEX, '')
     .replace(PRIORITY_EMOJI_REGEX, '')
+    .replace(HIDDEN_COMMENT_REGEX, '')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -240,14 +242,18 @@ export function setTaskSomeday(line: string, someday: boolean): string {
 }
 
 export function setTaskDescription(line: string, newDescription: string): string {
-  const parsed = parseTaskLine(line, 'temp.md', 0);
+  const hiddenComments = line.match(HIDDEN_COMMENT_REGEX) ?? [];
+  const visibleLine = line.replace(HIDDEN_COMMENT_REGEX, '').replace(/[ \t]+$/, '').trimEnd();
+  const parsed = parseTaskLine(visibleLine, 'temp.md', 0);
   if (!parsed || !parsed.description) {
-    const match = line.match(TASK_REGEX);
+    const match = visibleLine.match(TASK_REGEX);
     if (!match) return line;
-    return `${match[1]}${match[2]}${match[3]}${newDescription}`;
+    const updated = `${match[1]}${match[2]}${match[3]}${newDescription}`;
+    return hiddenComments.length ? `${updated} ${hiddenComments.join(' ')}` : updated;
   }
 
-  return line.replace(parsed.description, newDescription.trim());
+  const updated = visibleLine.replace(parsed.description, newDescription.trim()).trimEnd();
+  return hiddenComments.length ? `${updated} ${hiddenComments.join(' ')}` : updated;
 }
 
 export function getGTDSection(task: TaskItem, todayStr: string): GTDSectionId | null {

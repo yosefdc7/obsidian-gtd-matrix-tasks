@@ -1,101 +1,52 @@
 # Current Work — obsidian-gtd-matrix-tasks
 
 ## Objective
-Port the approved **Stream UI** direction into the plugin on the ADR 0005 modular renderers (ADR 0008): the List layout becomes the Stream list, shared chrome (header, NL quick-add, role chips, every add-composer, quick-capture modal) gets the Stream treatment, and secondary toolbar controls move behind an options disclosure. The Board keeps its kanban structure (drag-drop, swimlanes, mobile carousel untouched). Source design: `2nd Brain/prototypes/gtd-ui/refined-stream.html` (untouched).
+Add one-way Google Calendar projection for open Start-dated tasks while preserving Obsidian as the source of truth and preventing duplicate events across edits and devices.
 
 ## Status
-Bumped version to `v1.0.1` (`manifest.json`, `package.json`), rebuilt, deployed to `2nd brain v7`, and successfully pushed to Obsidian Sync cloud to invalidate mobile cache. All 214 unit tests passing (`214/214`), clean build, verified `manifest.json`, `main.js`, and `styles.css` are synced to cloud server.
+Implementation complete and deployed locally as v1.1.0. Automated verification passes. Live Obsidian reload and real Google OAuth/API verification remain pending because this host exposes neither the Obsidian CLI nor native-app UI control, and OAuth credentials have not been created.
 
 ## Completed
-- Released v1.0.1 & Synced to Cloud for Mobile Cache Invalidation:
-  - Bumped version to `1.0.1` in `manifest.json` and `package.json`.
-  - Built production bundle (`npm run build`) and deployed to `C:\Users\josef\Documents\2nd brain v7\.obsidian\plugins\gtd-matrix-tasks\`.
-  - Triggered Obsidian Sync scan; confirmed `manifest.json` (hash `caab3053...`), `main.js` (hash `774e35d9...`), and `styles.css` (hash `000f33cd...`) are uploaded and fully synced on remote server.
-- Streamlined Mobile Header & Removed Top Quick-Add Bar (`src/view/toolbar-renderer.ts`, `src/view/types.ts`, `src/view/view.ts`, `styles.css`):
-  - **Removed Top Quick-Add Bar Everywhere**: Completely removed `.gtd-nl-bar` and natural-language parse chips from the toolbar on both desktop and mobile; mobile quick capture relies on the floating `+` FAB (opening quick capture sheet), while desktop and mobile retain inline section/column composers (`+ Add task`).
-  - **Decluttered Mobile Header**: Hidden brand header ("GTD Matrix Tasks") and stats pill on mobile viewports (`@media (max-width: 768px), (pointer: coarse)`), reclaiming ~80px of top vertical screen height so tasks appear immediately below controls.
-  - **Responsive Mode Switcher Labels**: Shortened "GTD Workflow" to "GTD" on mobile (`.gtd-mode-label-short` / `.gtd-mode-label-full`) so `[GTD] [Eisenhower] [By Date]` and header action icons fit side-by-side on a single compact 36px row.
-  - **By Date Anchor Sub-Row**: Positioned Date Anchors (`[Start] [Scheduled] [Due]`) as a compact sub-row directly beneath mode tabs on mobile when By Date is active.
-  - **Expandable Mobile Search**: Replaced the static full-width search input with a 36px search toggle button (`.gtd-search-toggle-btn`) next to the Options button; tapping reveals a compact mobile search row (`.gtd-mobile-search-row`) with input and clear ('X') button. If an active search query exists, the row automatically stays open.
-  - **Fixed Button Padding**: Added `padding: 0 !important;` to `.gtd-search-toggle-btn` and `.gtd-options-toggle` to prevent Obsidian's `.is-tablet button` padding rules from squishing SVG icons.
-  - **Verification**: 214/214 Vitest tests passing, 0 TypeScript errors, bundle built and deployed to `2nd brain v7`, live-verified in Obsidian via CDP device emulation (390×844) with 0 errors captured. Committed `2eb699a`.
-- Quick Capture Top Sheet (`src/view/quick-capture-modal.ts`, `styles.css`):
-  - Fixed mobile keyboard overlap by anchoring the Quick Capture sheet to the top of the viewport (`align-items: flex-start`).
-  - Added slide-down animation (`@keyframes gtdSlideDown`, `translateY(-100%)` -> `translateY(0)`).
-  - Styled with rounded bottom corners (`border-radius: 0 0 16px 16px`), top-docked border (`border-top: none`), and status bar safe area clearance (`padding: calc(14px + env(safe-area-inset-top, 0px)) 18px 16px`).
-  - Added `enterkeyhint: 'send'` to the input field so tapping the mobile keyboard's blue action/enter key immediately captures the task.
-  - Added compact spacing (`gap: 10px`, tightened option row and button padding) and `max-height: calc(100vh - 24px); overflow-y: auto;` safety fallback.
-  - Committed with conventional tag `21558a6`.
-- Snapshot Cache Persistence & Metadata-Gated Scanning (`src/store/task-store.ts`, `src/store/scan-engine.ts`, `src/vault-scanner.ts`, `src/view/view.ts`, `src/main.ts`, `tests/task-store-snapshot.test.ts`):
-  - Added persistent snapshot adapter to `TaskStore` targeting `.obsidian/plugins/gtd-matrix-tasks/task-cache.json`.
-  - Implemented `loadSnapshot` to hydrate tasks instantly (~2ms) into `this.tasks` on plugin startup and view open.
-  - Implemented debounced snapshot serialization (`debouncedSaveSnapshot`) on task mutations and instant write on scan completion.
-  - Metadata-Gated Scanning: In `ScanEngine.scanVault()`, inspects `metadataCache.getFileCache(file)`. Files with no list items / tasks are skipped immediately without executing `cachedRead` or string splitting, eliminating ~1,400 unnecessary disk/file operations across the 1,500-note vault.
-  - Single-Flight Concurrency Guard: Added `currentScanPromise` to deduplicate simultaneous scan triggers from view opening and layout readiness.
-  - View Optimization: `GTDMatrixView.onload()` and `onOpen()` render immediately when tasks are loaded from snapshot; background scan reconciles edits without blocking the UI.
-  - 4 unit tests in `tests/task-store-snapshot.test.ts` verifying snapshot save/load, listener notification, error recovery on corrupted JSON, and schema version gating.
-  - Committed with conventional tag `122e0ac`.
-- Inline Auto-Complete for Task Editor (`src/view/inline-suggest.ts`, `src/view/card-renderer.ts`, `styles.css`):
-  - Built custom floating popover (`.gtd-suggest-popover`) attached to the task description inline `<input>`.
-  - Wikilink autocomplete triggered on `[[`: queries vault markdown files via `app.vault.getMarkdownFiles()` and `app.metadataCache.getCachedFiles()`, displaying note title and parent folder subtext. Inserting replaces the query with `[[Note Name]]` without duplicating closing brackets.
-  - Tag autocomplete triggered on `#`: queries vault tags via `app.metadataCache.getTags()`, displaying tag names with `#` prefix. Inserting replaces query with `#tag `.
-  - Keyboard navigation: `ArrowUp`/`ArrowDown` navigates suggestions (with wrapping), `Enter` or `Tab` applies the selection (preventing task save/submit), `Escape` dismisses the popover (without canceling input edit).
-  - Mouse navigation: clicking any item applies selection; `mousedown` on popover prevents stealing focus from input.
-  - 17 unit tests in `tests/inline-suggest.test.ts` verifying trigger detection, ranking, and replacement offset calculations.
-  - Deployed and live verified in `2nd brain v7` with zero runtime errors. Commit: `b48e1cf`.
-- Role Filter Pills & Filtering:
-  - Added "All" pill to role filter chips row (`All`, then configured roles, then `Untagged`).
-  - Exclusive radio-style filtering: clicking a pill (e.g. `Untagged`) activates *only* that pill and shows only tasks for that role.
-  - Clicking the same active solo pill again reverts back to "All" (all pills active).
-  - Modifier multi-select: holding `Shift` or `Ctrl`/`Cmd` allows toggling multiple specific roles simultaneously.
-  - Filtering dynamically applies to Swimlanes mode (soloing a role shows only that role's swimlane).
-- Configurable Role Tags Setting:
-  - Added "Role tags" text setting in plugin settings tab (`PluginSettings.configuredRoleTags`, default `'role/yo-manager, role/josef-selfcare, role/rj-supportive'`).
-  - Clean Title Case label derivation (`role/yo-manager` -> "Yo Manager", with custom title casing for user aliases).
-  - Deterministic rotating color palette (blue, emerald, purple, amber, cyan, rose).
-  - Unified tag & folder matching for task role resolution.
-  - Context menu for role assignment dynamically populates from configured role definitions.
-- `src/view/calendar-picker.ts`: Minimalist month grid date calendar picker popover (`showCalendarPicker`).
-  - Monday-first 7-column calendar grid with `<` and `>` month navigation.
-  - Formats ISO `YYYY-MM-DD`, detects today (`is-today`) and selected date (`is-selected`).
-  - 1-click select immediately calls `onSelect` and mutates date on task.
-  - Clicking currently selected date deselects it (sets to null); discreet "Clear date" button in footer also provided.
-  - Automatic positioning below anchor with viewport edge protection.
-  - Escape key or outside click (`pointerdown`) immediately dismisses popover.
-- `src/view/card-renderer.ts`: Replaced legacy `<input type="date">` in `showScheduledDatePicker`, `showDueDatePicker`, and `showStartDatePicker` with `showCalendarPicker`.
-- `styles.css`: Added styles for `.gtd-calendar-popover`, `.gtd-cal-header`, `.gtd-cal-title`, `.gtd-cal-nav-btn`, `.gtd-cal-weekdays`, `.gtd-cal-days`, `.gtd-cal-day`, `.gtd-cal-footer`, `.gtd-cal-clear-btn` matching Obsidian theme CSS variables.
-- Verified live in `2nd brain v7` via CDP and screenshot inspection. Commit: `66bcdf4`.
-- `src/nl-input.ts` (new, pure, zero obsidian imports): `parseNaturalLanguageInput` (`today`/`tomorrow`/`next week` → +0/+1/+7 UTC-stable; `p1..p4` → highest/high/medium/low; `#yo/#yomanager/#josef/#josefselfcare/#rj/#rjsupportive/#untagged` + spelled phrases → RoleId; tokens stripped, fallback to original text; unknown tokens kept) and `previewDestinationLabel` (synthesized task through the real classifiers → "adds to …" chip label).
-- `src/view/composer.ts` (new): `renderParseChips` (date/priority/role/destination chips + empty-state hint), `renderQuickAddRow` / `renderDateQuickAddRow` moved from `card-renderer.ts`; board columns + date buckets keep always-visible inputs, list/swimlane sections use the collapsed `+ Add task` reveal (Enter commits, Esc closes/clears); chip updates are local DOM (no `setState`), so typing never loses focus.
-- Mutator (`src/store/task-mutator.ts`): optional `parsed` overlay on `quickAddTask` / `quickAddTaskDated` with precedence role `parsed.role ?? lane` · priority `quadrant ?? parsed ?? section` · date `parsed ?? section`; new `deleteTaskLine(task)` (exact index → trimmed → 25-char fuzzy, splice + save + reindex; children left in place).
-- Toolbar (`toolbar-renderer.ts` + `ViewState.optionsOpen`): brand row (grid icon + stats pill + search) → segmented view tabs → By-Date-only anchor row → options disclosure (layout toggle, sort, Filter|Swimlanes, quick chips, folder, refresh) → NL quick-add bar with parse chips → role chips row. Options row survives re-renders; `optionsOpen` is session-only, default closed.
-- Rows (`card-renderer.ts`): check circle (`gtd-row-check`, aria "Complete task") | title (markdown + click-to-edit + links) | meta chips (date pills, icon-only priority, file link, role dot) | hover action cluster (schedule, move, more). Drag kept.
-- Section headers (`list-renderer.ts`): chevron + uppercase short title + count pill; full title/subtitle in tooltip; By Date buckets get their icon and stay non-collapsible.
-- Menu (`task-menus.ts`): "Delete task" (trash) item → `deleteTaskLine`.
-- Quick-capture modal: parse chips + hint under the input; commit passes the parsed overlay (`parsed.role ?? selected chip`).
-- `styles.css`: Stream sections (header/brand/tabs/options/NL bar/chips/section headers/rows/composer/role chips); legacy toolbar and `.gtd-task-item` rules replaced; board/swimlane/carousel/FAB/modal styles intact.
+- Added deterministic hidden-UUID identity, Google-safe event IDs, and private extended properties.
+- Added private/busy fixed-time event generation (default 07:00, 30 minutes, selected calendar timezone).
+- Added create/update/delete reconciliation with one-way overwrite semantics and no duplicate-on-rename behavior.
+- Added 15-second debounced startup/change sync, manual Sync now, retry-safe pending/error status, and non-blocking failures.
+- Added Google OAuth authorization-code flow using a personal Apps Script HTTPS callback and per-device Obsidian Secret Storage.
+- Added writable-calendar loading/selection and retained-old-calendar boundary.
+- Added Apps Script callback source and setup guide.
+- Hid UUID comments from parsed descriptions and preserved them during inline renames.
+- Bumped plugin to 1.1.0 and minimum Obsidian version to 1.11.4.
 
-## Important Decisions (full rationale in ADR 0008)
-- List becomes the Stream; Board keeps kanban structure; shared chrome only elsewhere.
-- Secondary controls behind an options disclosure; By Date anchor row stays inline.
-- NL grammar strips only known tokens; preview uses real classifiers; unknown tokens stay.
-- Priority stays icon-only in rows (prototype's P1..P4 text wins only in composer chips).
-- Delete is line-level without cascade; board FAB/modal unchanged.
-- Scoped CSS selectors (`.gtd-matrix-view input.X` / `button.X`) to outrank Obsidian's `input[type='text']` font-size and `.is-tablet button` padding rules (iOS 16px zoom + fixed-size icons).
+## Important Decisions
+- Only open `🛫 Start` tasks sync; Due and Scheduled do not.
+- Completing/cancelling/removing Start deletes the managed event.
+- Every task overlaps at the fixed configured start time; no free/busy placement.
+- Recurrence remains owned by Obsidian; only the current open occurrence syncs.
+- Switching destination calendars does not clean the former calendar.
+- Google device flow was rejected because its allowed scopes exclude Calendar; Apps Script relays the OAuth callback without storing tokens or Calendar data.
+
+## Changed Files
+- `src/calendar/*`
+- `src/main.ts`, `src/settings-tab.ts`, `src/types.ts`, `src/parser.ts`
+- `tests/calendar-*.test.ts`, `tests/google-*.test.ts`, `tests/parser.test.ts`
+- `companion/google-oauth-callback/Code.gs`
+- `docs/google-calendar-setup.md`
+- `manifest.json`, `package.json`, `package-lock.json`
 
 ## Verification
-- `npm test`: 185/185 passed (13 files; 158 prior + 27 new across `nl-input` and `task-mutator`). `tsc --noEmit` exit 0. `npm run build` OK; deployed via `scripts/deploy-plugin.ps1` to `2nd brain v7`.
-- Live NL quick-add (chips `⏳ Tomorrow | P1 | RJ Supportive | ⏎ Add to Next Actions`) wrote the task line to `Jots/2026/Sep/Sep 15 2026.md` and the row appeared in Next Actions; deleted afterwards via the row menu ("Delete task") — file + DOM clean, store back to 54 rows.
-- Waiting composer with `p2`: chips `P2 | ⏎ Add to Waiting`, wrote `- [?] … 🔼`, auto-closed; completion toggle wrote `[x] ✅ 2026-09-15` (row re-classified to Done) and reverted.
-- Options disclosure: board→list round-trip persisted through on-disk `data.json` (`"defaultLayoutMode": "list"`); optionsOpen state survived re-renders.
-- Eisenhower + By Date render (anchors, tag-mode toggle hidden, 8 buckets, 4 day composers). Mobile emulation (CDP 400×800): carousel `scroll-snap-type: x mandatory` on `.gtd-board`, 6 tab buttons, 6 column quick-adds; FAB 52×52/svg 24×24; modal parse chips + Escape close.
-- Scoped-selector fixes verified: nl/search inputs 16px, row check 32×32 (mobile) / 18×18 (desktop), action buttons 34/26, options toggle 40/32, layout buttons 36×36, all svg intact.
-- `dev:errors` clean after every interaction. Screenshots: `%TEMP%\gtd-stream-verify\` (stream + board mobile, desktop final).
-- Note: after `plugin:reload` or a mobile-emulation reload, stale leaves lose `contentEl`; detach them (`getLeavesOfType('gtd-matrix-tasks-view')`) and call `plugin.activateView()` before DOM checks.
-
-## Changed Files (committed `21558a6`)
-- Modified: `src/view/quick-capture-modal.ts`, `styles.css`
+- `vitest run`: 251/251 passed across 22 files.
+- `tsc --noEmit`: passed.
+- Production esbuild: passed.
+- Deployed to `C:\Users\josef\Documents\2nd Brain\.obsidian\plugins\gtd-matrix-tasks`.
+- Deployed manifest reports v1.1.0 / minAppVersion 1.11.4.
 
 ## Next
-1. User verification on mobile device — test opening Quick Capture via FAB, confirming sheet drops down from top and remains fully accessible above the virtual keyboard.
-2. (Deferred, optional) "new row flash" animation from the prototype.
+1. Reload GTD Matrix Tasks in Obsidian and confirm no runtime errors.
+2. Follow `docs/google-calendar-setup.md` to create the personal Google Cloud OAuth client and Apps Script callback.
+3. Connect on desktop, load/select the target calendar, and run Sync now.
+4. Verify create, rename, Start-date change, completion deletion, manual Google deletion recovery, and no duplicates.
+5. Connect once on mobile and repeat a smoke test.
+
+## Blockers / Unknowns
+- No Google OAuth credentials or live calendar were available, so external integration is not yet proven.
+- Native Obsidian UI control and Obsidian CLI were unavailable, so live plugin reload/runtime error inspection is pending.
