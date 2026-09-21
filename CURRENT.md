@@ -4,7 +4,7 @@
 Add one-way Google Calendar projection for open Start-dated tasks while preserving Obsidian as the source of truth and preventing duplicate events across edits and devices.
 
 ## Status
-Implementation complete and deployed locally as v1.1.0. Automated verification passes. Live Obsidian reload and real Google OAuth/API verification remain pending because this host exposes neither the Obsidian CLI nor native-app UI control, and OAuth credentials have not been created.
+Implementation committed and pushed to `origin/master` as `0bdc629` (`feat: add one-way Google Calendar sync`), and deployed locally as v1.1.0. Automated verification passes. Live Obsidian reload and real Google OAuth/API verification remain pending because this host exposes neither the Obsidian CLI nor native-app UI control, and OAuth credentials have not been created.
 
 ## Completed
 - Added deterministic hidden-UUID identity, Google-safe event IDs, and private extended properties.
