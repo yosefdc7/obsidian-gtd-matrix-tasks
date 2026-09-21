@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { parseTaskLine } from '../src/parser';
 import {
   buildDateBuckets,
+  createDefaultCollapsedSections,
   dateBucketDayId,
+  getDateBucketEmphasis,
   getAnchorDate,
   getDateBucketId,
   groupByDateBucket,
@@ -121,6 +123,25 @@ describe('buildDateBuckets', () => {
     expect(droppable).toHaveLength(8);
     expect(buckets[0].dayDate).toBeNull();
     expect(buckets[12].dayDate).toBeNull();
+  });
+
+  it('identifies only Today and Tomorrow for restrained header emphasis', () => {
+    const buckets = buildDateBuckets(TODAY);
+    expect(getDateBucketEmphasis(buckets[1], TODAY)).toBe('current-day');
+    expect(getDateBucketEmphasis(buckets[2], TODAY)).toBe('current-day');
+    expect(getDateBucketEmphasis(buckets[3], TODAY)).toBeNull();
+    expect(getDateBucketEmphasis(buckets[0], TODAY)).toBeNull();
+  });
+});
+
+describe('createDefaultCollapsedSections', () => {
+  it('starts every Completed group collapsed without collapsing other work', () => {
+    const collapsed = createDefaultCollapsedSections();
+    expect(collapsed).toEqual(new Set([
+      DATE_BUCKET_COMPLETED,
+      'gtd-completed',
+      'eisen-completed'
+    ]));
   });
 });
 

@@ -2472,5 +2472,105 @@
   opacity: 0.85;
 }
 
+/* Neutral task language: status is conveyed by words, icons, and placement—not colour. */
+.gtd-matrix-view .gtd-section.badge-inbox,
+.gtd-matrix-view .gtd-section.badge-next-actions,
+.gtd-matrix-view .gtd-section.badge-q1,
+.gtd-matrix-view .gtd-section.badge-q2,
+.gtd-matrix-view .gtd-section.badge-q3,
+.gtd-matrix-view .gtd-section.badge-scheduled,
+.gtd-matrix-view .gtd-section.badge-q4,
+.gtd-matrix-view .gtd-section.badge-done,
+.gtd-matrix-view .gtd-section.badge-date-past,
+.gtd-matrix-view .gtd-section.badge-date-day,
+.gtd-matrix-view .gtd-section.badge-date-soon,
+.gtd-matrix-view .gtd-section.badge-date-someday,
+.gtd-matrix-view .gtd-section.badge-date-undated,
+.gtd-matrix-view .gtd-swimlane-row.badge-role-yo-manager,
+.gtd-matrix-view .gtd-swimlane-row.badge-role-josef-selfcare,
+.gtd-matrix-view .gtd-swimlane-row.badge-role-rj-supportive,
+.gtd-matrix-view .gtd-swimlane-row.badge-role-untagged {
+  border-left: 1px solid var(--background-modifier-border) !important;
+  opacity: 1;
+}
+
+.gtd-matrix-view .gtd-section.is-current-day .gtd-section-title,
+.gtd-matrix-view .gtd-board-column.is-current-day .gtd-board-col-title {
+  color: var(--text-normal);
+}
+
+.gtd-matrix-view .gtd-date-pill,
+.gtd-matrix-view .gtd-date-scheduled,
+.gtd-matrix-view .gtd-date-due,
+.gtd-matrix-view .gtd-date-start,
+.gtd-matrix-view .gtd-date-pill.is-overdue,
+.gtd-matrix-view .gtd-date-pill.is-today,
+.gtd-matrix-view .gtd-nl-chip-date,
+.gtd-matrix-view .gtd-nl-chip-pri.pri-highest,
+.gtd-matrix-view .gtd-nl-chip-pri.pri-high,
+.gtd-matrix-view .gtd-nl-chip-pri.pri-medium,
+.gtd-matrix-view .gtd-nl-chip-pri.pri-low,
+.gtd-matrix-view .gtd-nl-chip-role.role-yo-manager,
+.gtd-matrix-view .gtd-nl-chip-role.role-josef-selfcare,
+.gtd-matrix-view .gtd-nl-chip-role.role-rj-supportive,
+.gtd-matrix-view .gtd-nl-chip-dest,
+.gtd-matrix-view .gtd-role-badge,
+.gtd-matrix-view .gtd-role-badge.has-custom-color,
+.gtd-matrix-view .badge-role-yo-manager,
+.gtd-matrix-view .badge-role-josef-selfcare,
+.gtd-matrix-view .badge-role-rj-supportive,
+.gtd-matrix-view .badge-role-untagged,
+.gtd-matrix-view .gtd-priority-badge.priority-highest,
+.gtd-matrix-view .gtd-priority-badge.priority-high,
+.gtd-matrix-view .gtd-priority-badge.priority-medium,
+.gtd-matrix-view .gtd-priority-badge.priority-low,
+.gtd-matrix-view .gtd-priority-badge.priority-lowest {
+  color: var(--text-muted) !important;
+  border-color: var(--background-modifier-border) !important;
+  background: var(--background-secondary) !important;
+}
+
+.gtd-matrix-view .gtd-role-dot,
+.gtd-matrix-view .gtd-role-badge.has-custom-color .gtd-role-dot,
+.gtd-matrix-view .gtd-role-chip-dot,
+.gtd-matrix-view .gtd-role-chip-btn.has-custom-color .gtd-role-chip-dot {
+  background: var(--text-faint) !important;
+}
+
+.gtd-matrix-view .gtd-role-chip-btn.is-active,
+.gtd-matrix-view .gtd-role-chip-btn.chip-role-yo-manager.is-active,
+.gtd-matrix-view .gtd-role-chip-btn.chip-role-josef-selfcare.is-active,
+.gtd-matrix-view .gtd-role-chip-btn.chip-role-rj-supportive.is-active,
+.gtd-matrix-view .gtd-role-chip-btn.chip-untagged.is-active,
+.gtd-matrix-view .gtd-role-chip-btn.has-custom-color.is-active {
+  color: var(--text-normal) !important;
+  border-color: var(--text-muted) !important;
+  background: var(--background-modifier-hover) !important;
+}
+
+.gtd-matrix-view .gtd-row-check.prio-highest,
+.gtd-matrix-view .gtd-row-check.prio-high,
+.gtd-matrix-view .gtd-row-check.prio-medium,
+.gtd-matrix-view .gtd-row-check.prio-low,
+.gtd-matrix-view .gtd-row-check.prio-none,
+.gtd-matrix-view button.gtd-row-check.prio-highest,
+.gtd-matrix-view button.gtd-row-check.prio-high,
+.gtd-matrix-view button.gtd-row-check.prio-medium,
+.gtd-matrix-view button.gtd-row-check.prio-low,
+.gtd-matrix-view button.gtd-row-check.prio-none {
+  border-color: var(--text-muted) !important;
+}
+
+.gtd-matrix-view .gtd-row-check.is-checked,
+.gtd-matrix-view button.gtd-row-check.is-checked {
+  background: var(--text-muted) !important;
+  border-color: var(--text-muted) !important;
+  color: var(--background-primary) !important;
+}
+
+.gtd-matrix-view .gtd-checkbox {
+  accent-color: var(--text-muted);
+}
+
 
 

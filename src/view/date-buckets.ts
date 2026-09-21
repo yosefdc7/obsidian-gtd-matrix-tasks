@@ -18,6 +18,11 @@ export const DATE_BUCKET_SOMEDAY = 'date-someday';
 export const DATE_BUCKET_UNDATED = 'date-undated';
 export const DATE_BUCKET_COMPLETED = 'date-completed';
 
+/** Sections that should begin collapsed for a calmer first scan of any view. */
+export function createDefaultCollapsedSections(): Set<string> {
+  return new Set([DATE_BUCKET_COMPLETED, 'gtd-completed', 'eisen-completed']);
+}
+
 /** Individual day buckets cover Today through today + 7 (8 buckets). */
 export const DAY_BUCKET_COUNT = 8;
 /** Soon covers +8 to +90 days; beyond that is Someday (matches GTD routing). */
@@ -28,6 +33,17 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 export function dateBucketDayId(dateStr: string): string {
   return `date-day:${dateStr}`;
+}
+
+/** Today and Tomorrow share the sole date-header emphasis; all other buckets remain neutral. */
+export function getDateBucketEmphasis(
+  bucket: DateBucketDefinition,
+  todayStr: string
+): 'current-day' | null {
+  if (!bucket.dayDate) return null;
+  return daysBetween(todayStr, bucket.dayDate) >= 0 && daysBetween(todayStr, bucket.dayDate) <= 1
+    ? 'current-day'
+    : null;
 }
 
 /** UTC-stable day offset (mirrors task-transitions.addDays). */

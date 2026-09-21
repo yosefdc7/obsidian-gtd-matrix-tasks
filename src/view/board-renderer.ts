@@ -2,7 +2,7 @@ import { setIcon } from 'obsidian';
 import { getEisenhowerSection, getGTDSection, sortTasks } from '../parser';
 import { renderBoardCard } from './card-renderer';
 import { renderDateQuickAddRow, renderQuickAddRow } from './composer';
-import type { DateBucketDefinition } from './date-buckets';
+import { getDateBucketEmphasis, type DateBucketDefinition } from './date-buckets';
 import { getSectionShortTitle, getSwimlaneDefinitions } from './types';
 import type { ViewContext } from './types';
 import type { RoleId, SectionDefinition, SectionId, TaskItem } from '../types';
@@ -320,7 +320,10 @@ export function renderDateBoard(
 
   for (const bucket of buckets) {
     const colTasks = grouped.get(bucket.id) || [];
-    const col = board.createDiv({ cls: `gtd-board-column ${bucket.badgeClass}` });
+    const emphasis = getDateBucketEmphasis(bucket, ctx.getTodayDateString());
+    const col = board.createDiv({
+      cls: `gtd-board-column ${bucket.badgeClass} ${emphasis ? `is-${emphasis}` : ''}`
+    });
     col.setAttribute('data-section-id', bucket.id);
 
     // Column header

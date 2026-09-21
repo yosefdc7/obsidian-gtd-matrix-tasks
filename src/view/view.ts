@@ -3,7 +3,7 @@ import { VaultScanner } from '../vault-scanner';
 import { DEFAULT_SETTINGS } from '../types';
 import type { PluginSettings, RoleId, SectionId, TaskItem } from '../types';
 import { renderBoard, renderDateBoard, renderSwimlaneBoard } from './board-renderer';
-import { buildDateBuckets, groupByDateBucket } from './date-buckets';
+import { buildDateBuckets, createDefaultCollapsedSections, groupByDateBucket } from './date-buckets';
 import { renderDateList, renderSection, renderSwimlaneList } from './list-renderer';
 import { openQuickAddModal, renderFloatingActionButton } from './quick-capture-modal';
 import { filterTasks, groupBySection } from './task-filter';
@@ -48,7 +48,7 @@ export class GTDMatrixView extends ItemView {
       searchQuery: '',
       activeChip: 'all',
       selectedFolder: 'all',
-      collapsedSections: new Set<string>(),
+      collapsedSections: createDefaultCollapsedSections(),
       optionsOpen: false,
       mobileSearchOpen: false
     };

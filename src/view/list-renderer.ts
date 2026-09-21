@@ -2,7 +2,7 @@ import { setIcon } from 'obsidian';
 import { getEisenhowerSection, getGTDSection, sortTasks } from '../parser';
 import { renderTaskItem } from './card-renderer';
 import { renderDateQuickAddRow, renderQuickAddRow } from './composer';
-import { DATE_BUCKET_COMPLETED } from './date-buckets';
+import { DATE_BUCKET_COMPLETED, getDateBucketEmphasis } from './date-buckets';
 import type { DateBucketDefinition } from './date-buckets';
 import { getSectionShortTitle, getSwimlaneDefinitions } from './types';
 import type { ViewContext } from './types';
@@ -192,8 +192,9 @@ function renderDateSection(
   ctx: ViewContext
 ): void {
   const isCollapsed = ctx.getState().collapsedSections.has(bucket.id);
+  const emphasis = getDateBucketEmphasis(bucket, ctx.getTodayDateString());
   const sectionEl = container.createDiv({
-    cls: `gtd-section ${bucket.badgeClass} ${isCollapsed ? 'collapsed' : ''}`
+    cls: `gtd-section ${bucket.badgeClass} ${emphasis ? `is-${emphasis}` : ''} ${isCollapsed ? 'collapsed' : ''}`
   });
 
   // Header: toggle chevron + bucket icon + short title + count
