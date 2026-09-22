@@ -2,7 +2,7 @@ import { setIcon } from 'obsidian';
 import { getEisenhowerSection, getGTDSection, sortTasks } from '../parser';
 import { renderBoardCard } from './card-renderer';
 import { renderDateQuickAddRow, renderQuickAddRow } from './composer';
-import { getDateBucketEmphasis, type DateBucketDefinition } from './date-buckets';
+import { getDateBucketEmphasis, getVisibleDateBuckets, type DateBucketDefinition } from './date-buckets';
 import { getSectionShortTitle, getSwimlaneDefinitions } from './types';
 import type { ViewContext } from './types';
 import type { RoleId, SectionDefinition, SectionId, TaskItem } from '../types';
@@ -251,11 +251,12 @@ export function renderDateBoard(
   grouped: Map<string, TaskItem[]>,
   ctx: ViewContext
 ): void {
+  const visibleBuckets = getVisibleDateBuckets(buckets, grouped);
   // Render mobile column tabs carousel
   const tabsWrapper = container.createDiv({ cls: 'gtd-mobile-col-tabs' });
   const tabButtons = new Map<string, HTMLButtonElement>();
 
-  for (const bucket of buckets) {
+  for (const bucket of visibleBuckets) {
     const colTasks = grouped.get(bucket.id) || [];
     const tabBtn = tabsWrapper.createEl('button', {
       cls: 'gtd-mobile-tab-btn',
@@ -264,8 +265,7 @@ export function renderDateBoard(
     const iconSpan = tabBtn.createSpan({ cls: 'gtd-mobile-tab-icon' });
     setIcon(iconSpan, bucket.icon);
 
-    const shortTitle = bucket.title.split('—')[0].trim();
-    tabBtn.createSpan({ cls: 'gtd-mobile-tab-label', text: shortTitle });
+    tabBtn.createSpan({ cls: 'gtd-mobile-tab-label', text: bucket.title });
     tabBtn.createSpan({ cls: 'gtd-count-badge', text: String(colTasks.length) });
 
     tabBtn.addEventListener('click', () => {
@@ -280,8 +280,8 @@ export function renderDateBoard(
     tabButtons.set(bucket.id, tabBtn);
   }
 
-  if (buckets.length > 0) {
-    tabButtons.get(buckets[0].id)?.addClass('is-active');
+  if (visibleBuckets.length > 0) {
+    tabButtons.get(visibleBuckets[0].id)?.addClass('is-active');
   }
 
   const board = container.createDiv({ cls: 'gtd-board' });
@@ -318,7 +318,7 @@ export function renderDateBoard(
     }, 75);
   });
 
-  for (const bucket of buckets) {
+  for (const bucket of visibleBuckets) {
     const colTasks = grouped.get(bucket.id) || [];
     const emphasis = getDateBucketEmphasis(bucket, ctx.getTodayDateString());
     const col = board.createDiv({
@@ -330,7 +330,11 @@ export function renderDateBoard(
     const colHeader = col.createDiv({ cls: 'gtd-board-col-header' });
     const iconSpan = colHeader.createSpan({ cls: 'gtd-board-col-icon' });
     setIcon(iconSpan, bucket.icon);
-    colHeader.createSpan({ cls: 'gtd-board-col-title', text: bucket.title });
+    const heading = colHeader.createDiv({ cls: 'gtd-board-col-heading' });
+    heading.createSpan({ cls: 'gtd-board-col-title', text: bucket.title });
+    if (bucket.rangeLabel) {
+      heading.createSpan({ cls: 'gtd-bucket-range', text: bucket.rangeLabel });
+    }
     colHeader.createSpan({ cls: 'gtd-count-badge', text: String(colTasks.length) });
 
     // Drop zone (day buckets only; other buckets reject drops)

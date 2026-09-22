@@ -313,3 +313,10 @@ export function groupByDateBucket(
 
   return grouped;
 }
+
+export function getVisibleDateBuckets(
+  buckets: DateBucketDefinition[],
+  grouped: Map<string, TaskItem[]>
+): DateBucketDefinition[] {
+  return buckets.filter((bucket) => (grouped.get(bucket.id)?.length ?? 0) > 0);
+}

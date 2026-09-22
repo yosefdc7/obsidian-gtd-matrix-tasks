@@ -1354,6 +1354,23 @@
   color: var(--text-normal);
 }
 
+.gtd-bucket-range {
+  color: var(--text-faint);
+  font-size: 0.72em;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.gtd-board-col-heading {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
 /* Drop zone */
 .gtd-board-drop-zone {
   flex: 1;

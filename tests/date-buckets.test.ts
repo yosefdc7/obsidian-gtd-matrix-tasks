@@ -7,6 +7,7 @@ import {
   getDateBucketEmphasis,
   getAnchorDate,
   getDateBucketId,
+  getVisibleDateBuckets,
   groupByDateBucket,
   DATE_BUCKET_COMPLETED,
   DATE_BUCKET_LATER,
@@ -217,5 +218,19 @@ describe('createDefaultCollapsedSections', () => {
       'gtd-completed',
       'eisen-completed'
     ]));
+  });
+});
+
+describe('getVisibleDateBuckets', () => {
+  it('keeps only buckets that contain tasks', () => {
+    const buckets = buildDateBuckets(HORIZON_TODAY);
+    const grouped = new Map(buckets.map((bucket) => [bucket.id, [] as TaskItem[]]));
+    grouped.set(dateBucketDayId(HORIZON_TODAY), [makeTask('- [ ] Today 📅 2026-09-22')]);
+    grouped.set(DATE_BUCKET_UNDATED, [makeTask('- [ ] No date')]);
+
+    expect(getVisibleDateBuckets(buckets, grouped).map((bucket) => bucket.id)).toEqual([
+      dateBucketDayId(HORIZON_TODAY),
+      DATE_BUCKET_UNDATED
+    ]);
   });
 });

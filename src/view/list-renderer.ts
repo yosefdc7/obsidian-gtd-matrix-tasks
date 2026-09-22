@@ -2,7 +2,7 @@ import { setIcon } from 'obsidian';
 import { getEisenhowerSection, getGTDSection, sortTasks } from '../parser';
 import { renderTaskItem } from './card-renderer';
 import { renderDateQuickAddRow, renderQuickAddRow } from './composer';
-import { DATE_BUCKET_COMPLETED, getDateBucketEmphasis } from './date-buckets';
+import { getDateBucketEmphasis, getVisibleDateBuckets } from './date-buckets';
 import type { DateBucketDefinition } from './date-buckets';
 import { getSectionShortTitle, getSwimlaneDefinitions } from './types';
 import type { ViewContext } from './types';
@@ -170,7 +170,7 @@ export function renderSwimlaneList(
   }
 }
 
-/** By Date list: accordion buckets; hides empty groups except Completed Today. */
+/** By Date list: accordion buckets; hides every empty group. */
 export function renderDateList(
   container: HTMLElement,
   buckets: DateBucketDefinition[],
@@ -178,9 +178,8 @@ export function renderDateList(
   ctx: ViewContext
 ): void {
   const wrapper = container.createDiv({ cls: 'gtd-sections-wrapper' });
-  for (const bucket of buckets) {
+  for (const bucket of getVisibleDateBuckets(buckets, grouped)) {
     const tasks = grouped.get(bucket.id) || [];
-    if (tasks.length === 0 && bucket.id !== DATE_BUCKET_COMPLETED) continue;
     renderDateSection(wrapper, bucket, tasks, ctx);
   }
 }
@@ -208,10 +207,10 @@ function renderDateSection(
   setIcon(iconSpan, bucket.icon);
 
   const titleGroup = headerEl.createDiv({ cls: 'gtd-title-group' });
-  titleGroup.createSpan({
-    cls: 'gtd-section-title',
-    text: bucket.title.split('—')[0].trim()
-  });
+  titleGroup.createSpan({ cls: 'gtd-section-title', text: bucket.title });
+  if (bucket.rangeLabel) {
+    titleGroup.createSpan({ cls: 'gtd-bucket-range', text: bucket.rangeLabel });
+  }
   titleGroup.createSpan({ cls: 'gtd-count-badge', text: String(tasks.length) });
 
   headerEl.addEventListener('click', (e) => {
