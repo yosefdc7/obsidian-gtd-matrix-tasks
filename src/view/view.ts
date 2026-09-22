@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS } from '../types';
 import type { PluginSettings, RoleId, SectionId, TaskItem } from '../types';
 import { renderBoard, renderDateBoard, renderSwimlaneBoard } from './board-renderer';
 import { buildDateBuckets, createDefaultCollapsedSections, groupByDateBucket } from './date-buckets';
-import { millisecondsUntilNextLocalMidnight } from './date-rollover';
+import { isViewLifecycleCurrent, millisecondsUntilNextLocalMidnight } from './date-rollover';
 import { renderDateList, renderSection, renderSwimlaneList } from './list-renderer';
 import { openQuickAddModal, renderFloatingActionButton } from './quick-capture-modal';
 import { filterTasks, groupBySection } from './task-filter';
@@ -23,6 +23,7 @@ export class GTDMatrixView extends ItemView {
   private unsubscribe: (() => void) | null = null;
   private ctxCache: ViewContext | null = null;
   private midnightTimer: number | null = null;
+  private lifecycleGeneration = 0;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -91,6 +92,7 @@ export class GTDMatrixView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    const openGeneration = ++this.lifecycleGeneration;
     if (!this.unsubscribe) {
       this.unsubscribe = this.scanner.onTasksUpdated(() => {
         this.render();
@@ -99,12 +101,15 @@ export class GTDMatrixView extends ItemView {
     this.render();
     if (this.scanner.getTasks().length === 0) {
       await this.scanner.scanVault();
+      if (!isViewLifecycleCurrent(openGeneration, this.lifecycleGeneration)) return;
       this.render();
     }
+    if (!isViewLifecycleCurrent(openGeneration, this.lifecycleGeneration)) return;
     this.scheduleMidnightRefresh();
   }
 
   async onClose(): Promise<void> {
+    this.lifecycleGeneration += 1;
     if (this.midnightTimer !== null) {
       window.clearTimeout(this.midnightTimer);
       this.midnightTimer = null;

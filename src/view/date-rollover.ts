@@ -4,3 +4,7 @@ export function millisecondsUntilNextLocalMidnight(now: Date): number {
   next.setHours(0, 0, 0, 0);
   return Math.max(1, next.getTime() - now.getTime());
 }
+
+export function isViewLifecycleCurrent(openGeneration: number, currentGeneration: number): boolean {
+  return openGeneration === currentGeneration;
+}

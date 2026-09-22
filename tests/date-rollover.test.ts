@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { millisecondsUntilNextLocalMidnight } from '../src/view/date-rollover';
+import { isViewLifecycleCurrent, millisecondsUntilNextLocalMidnight } from '../src/view/date-rollover';
 
 describe('millisecondsUntilNextLocalMidnight', () => {
   it('returns the remaining local-day duration', () => {
@@ -10,5 +10,10 @@ describe('millisecondsUntilNextLocalMidnight', () => {
   it('returns one local day when called exactly at midnight', () => {
     expect(millisecondsUntilNextLocalMidnight(new Date(2026, 8, 22, 0, 0, 0, 0)))
       .toBe(new Date(2026, 8, 23, 0, 0, 0, 0).getTime() - new Date(2026, 8, 22, 0, 0, 0, 0).getTime());
+  });
+
+  it('invalidates a pending open after the view closes', () => {
+    expect(isViewLifecycleCurrent(3, 4)).toBe(false);
+    expect(isViewLifecycleCurrent(4, 4)).toBe(true);
   });
 });
