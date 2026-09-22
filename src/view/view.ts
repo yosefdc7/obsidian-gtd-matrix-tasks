@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS } from '../types';
 import type { PluginSettings, RoleId, SectionId, TaskItem } from '../types';
 import { renderBoard, renderDateBoard, renderSwimlaneBoard } from './board-renderer';
 import { buildDateBuckets, createDefaultCollapsedSections, groupByDateBucket } from './date-buckets';
+import { millisecondsUntilNextLocalMidnight } from './date-rollover';
 import { renderDateList, renderSection, renderSwimlaneList } from './list-renderer';
 import { openQuickAddModal, renderFloatingActionButton } from './quick-capture-modal';
 import { filterTasks, groupBySection } from './task-filter';
@@ -21,6 +22,7 @@ export class GTDMatrixView extends ItemView {
   private viewState: ViewState;
   private unsubscribe: (() => void) | null = null;
   private ctxCache: ViewContext | null = null;
+  private midnightTimer: number | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -99,13 +101,27 @@ export class GTDMatrixView extends ItemView {
       await this.scanner.scanVault();
       this.render();
     }
+    this.scheduleMidnightRefresh();
   }
 
   async onClose(): Promise<void> {
+    if (this.midnightTimer !== null) {
+      window.clearTimeout(this.midnightTimer);
+      this.midnightTimer = null;
+    }
     if (this.unsubscribe) {
       this.unsubscribe();
       this.unsubscribe = null;
     }
+  }
+
+  private scheduleMidnightRefresh(): void {
+    if (this.midnightTimer !== null) window.clearTimeout(this.midnightTimer);
+    this.midnightTimer = window.setTimeout(() => {
+      this.midnightTimer = null;
+      this.render();
+      this.scheduleMidnightRefresh();
+    }, millisecondsUntilNextLocalMidnight(new Date()));
   }
 
   /** Seam consumed by the renderer modules; built once on first access. */
