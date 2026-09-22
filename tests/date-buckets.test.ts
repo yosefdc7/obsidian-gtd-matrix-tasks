@@ -154,17 +154,6 @@ describe('buildDateBuckets', () => {
   });
 });
 
-describe('createDefaultCollapsedSections', () => {
-  it('starts every Completed group collapsed without collapsing other work', () => {
-    const collapsed = createDefaultCollapsedSections();
-    expect(collapsed).toEqual(new Set([
-      DATE_BUCKET_COMPLETED,
-      'gtd-completed',
-      'eisen-completed'
-    ]));
-  });
-});
-
 describe('groupByDateBucket', () => {
   it('initializes every bucket and places tasks pre-sorted', () => {
     const later = makeTask('- [ ] Later 📅 2026-09-18');
@@ -187,11 +176,11 @@ describe('groupByDateBucket', () => {
     expect(all).not.toContain(doneOld);
   });
 
-  it('sorts within a bucket by the sort criteria', () => {
+  it('sorts within a bucket by anchor date, priority, and description', () => {
     const lowPrio = makeTask('- [ ] Low 📅 2026-09-17');
     const highPrio = makeTask('- [ ] High 📅 2026-09-17 ⏫');
     const grouped = groupByDateBucket([lowPrio, highPrio], 'scheduled', TODAY);
-    expect(grouped.get(DATE_BUCKET_LATER)).toEqual([lowPrio, highPrio]);
+    expect(grouped.get(DATE_BUCKET_LATER)).toEqual([highPrio, lowPrio]);
   });
 
   it('moves tasks between buckets when the anchor field changes', () => {
@@ -201,5 +190,32 @@ describe('groupByDateBucket', () => {
 
     const byStart = groupByDateBucket([task], 'start', TODAY);
     expect(byStart.get(DATE_BUCKET_PAST)).toEqual([task]);
+  });
+
+  it('sorts date buckets by selected anchor, priority, then description', () => {
+    const laterLow = makeTask('- [ ] Zebra ⏳ 2026-10-06 🛫 2026-10-08 🔽');
+    const earlierLow = makeTask('- [ ] Alpha ⏳ 2026-10-06 🛫 2026-10-07 🔽');
+    const earlierHigh = makeTask('- [ ] Beta ⏳ 2026-10-06 🛫 2026-10-07 ⏫');
+    const grouped = groupByDateBucket(
+      [laterLow, earlierLow, earlierHigh],
+      'start',
+      HORIZON_TODAY
+    );
+    expect(grouped.get(DATE_BUCKET_SOON)).toEqual([earlierHigh, earlierLow, laterLow]);
+  });
+});
+
+describe('createDefaultCollapsedSections', () => {
+  it('starts only long-horizon and completed date sections collapsed', () => {
+    expect(createDefaultCollapsedSections()).toEqual(new Set([
+      DATE_BUCKET_LATER,
+      DATE_BUCKET_NEXT_WEEK,
+      DATE_BUCKET_SOON,
+      DATE_BUCKET_SOMEDAY,
+      DATE_BUCKET_UNDATED,
+      DATE_BUCKET_COMPLETED,
+      'gtd-completed',
+      'eisen-completed'
+    ]));
   });
 });

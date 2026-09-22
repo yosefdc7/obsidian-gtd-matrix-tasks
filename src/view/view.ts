@@ -178,8 +178,7 @@ export class GTDMatrixView extends ItemView {
       const grouped = groupByDateBucket(
         filteredTasks,
         this.viewState.dateAnchor,
-        todayStr,
-        this.viewState.sortCriteria
+        todayStr
       );
       if (this.viewState.layoutMode === 'board') {
         renderDateBoard(container, buckets, grouped, this.ctx);

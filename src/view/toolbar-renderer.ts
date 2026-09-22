@@ -269,22 +269,24 @@ export function renderToolbar(container: HTMLElement, allTasks: TaskItem[], ctx:
     }
   });
 
-  // Sort Dropdown
-  const sortWrapper = optionsRow.createDiv({ cls: 'gtd-sort-wrapper' });
-  const sortSelect = sortWrapper.createEl('select', { cls: 'gtd-sort-select' });
-  const sortOptions: { id: SortCriteria; label: string }[] = [
-    { id: 'date', label: 'Sort: Date (Earliest)' },
-    { id: 'priority', label: 'Sort: Priority (Highest)' },
-    { id: 'title', label: 'Sort: Title (A-Z)' },
-    { id: 'created', label: 'Sort: Created (Newest)' }
-  ];
-  for (const opt of sortOptions) {
-    const optionEl = sortSelect.createEl('option', { value: opt.id, text: opt.label });
-    if (state.sortCriteria === opt.id) optionEl.selected = true;
+  // Sort Dropdown (date view has a fixed anchor-aware order)
+  if (state.viewMode !== 'date') {
+    const sortWrapper = optionsRow.createDiv({ cls: 'gtd-sort-wrapper' });
+    const sortSelect = sortWrapper.createEl('select', { cls: 'gtd-sort-select' });
+    const sortOptions: { id: SortCriteria; label: string }[] = [
+      { id: 'date', label: 'Sort: Date (Earliest)' },
+      { id: 'priority', label: 'Sort: Priority (Highest)' },
+      { id: 'title', label: 'Sort: Title (A-Z)' },
+      { id: 'created', label: 'Sort: Created (Newest)' }
+    ];
+    for (const opt of sortOptions) {
+      const optionEl = sortSelect.createEl('option', { value: opt.id, text: opt.label });
+      if (state.sortCriteria === opt.id) optionEl.selected = true;
+    }
+    sortSelect.addEventListener('change', () => {
+      ctx.setState({ sortCriteria: sortSelect.value as SortCriteria });
+    });
   }
-  sortSelect.addEventListener('change', () => {
-    ctx.setState({ sortCriteria: sortSelect.value as SortCriteria });
-  });
 
   // Tag / Role View Mode Toggle [Filter | Swimlanes] — hidden while By Date is active
   if (state.viewMode !== 'date') {

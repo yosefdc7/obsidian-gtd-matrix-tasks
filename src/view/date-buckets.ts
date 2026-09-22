@@ -1,5 +1,4 @@
-import { DateAnchorField, SortCriteria, TaskItem } from '../types';
-import { sortTasks } from '../parser';
+import { DateAnchorField, TaskItem } from '../types';
 
 /** A single column/group of the By Date view. */
 export interface DateBucketDefinition {
@@ -23,7 +22,16 @@ export const DATE_BUCKET_COMPLETED = 'date-completed';
 
 /** Sections that should begin collapsed for a calmer first scan of any view. */
 export function createDefaultCollapsedSections(): Set<string> {
-  return new Set([DATE_BUCKET_COMPLETED, 'gtd-completed', 'eisen-completed']);
+  return new Set([
+    DATE_BUCKET_LATER,
+    DATE_BUCKET_NEXT_WEEK,
+    DATE_BUCKET_SOON,
+    DATE_BUCKET_SOMEDAY,
+    DATE_BUCKET_UNDATED,
+    DATE_BUCKET_COMPLETED,
+    'gtd-completed',
+    'eisen-completed'
+  ]);
 }
 
 /** Soon covers the days after Next Week through today + 90; beyond that is Someday. */
@@ -255,12 +263,37 @@ export function buildDateBuckets(todayStr: string): DateBucketDefinition[] {
   ];
 }
 
+const PRIORITY_WEIGHT: Record<TaskItem['priority'], number> = {
+  highest: 5,
+  high: 4,
+  medium: 3,
+  low: 2,
+  lowest: 1,
+  none: 0
+};
+
+export function sortDateBucketTasks(
+  tasks: TaskItem[],
+  anchorField: DateAnchorField
+): TaskItem[] {
+  return [...tasks].sort((a, b) => {
+    const dateA = getAnchorDate(a, anchorField);
+    const dateB = getAnchorDate(b, anchorField);
+    if (dateA && dateB && dateA !== dateB) return dateA.localeCompare(dateB);
+    if (dateA && !dateB) return -1;
+    if (!dateA && dateB) return 1;
+
+    const priorityDiff = PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority];
+    if (priorityDiff !== 0) return priorityDiff;
+    return a.description.localeCompare(b.description, undefined, { sensitivity: 'base' });
+  });
+}
+
 /** Buckets tasks by Anchor Date, pre-sorted per bucket for the renderers. */
 export function groupByDateBucket(
   tasks: TaskItem[],
   anchorField: DateAnchorField,
-  todayStr: string,
-  sortCriteria: SortCriteria = 'date'
+  todayStr: string
 ): Map<string, TaskItem[]> {
   const grouped = new Map<string, TaskItem[]>();
   for (const bucket of buildDateBuckets(todayStr)) {
@@ -275,7 +308,7 @@ export function groupByDateBucket(
   }
 
   for (const [id, list] of grouped) {
-    grouped.set(id, sortTasks(list, sortCriteria));
+    grouped.set(id, sortDateBucketTasks(list, anchorField));
   }
 
   return grouped;
