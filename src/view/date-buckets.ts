@@ -6,6 +6,7 @@ export interface DateBucketDefinition {
   id: string;
   title: string;
   subtitle: string;
+  rangeLabel: string | null;
   badgeClass: string;
   icon: string;
   /** ISO date for drop-enabled day buckets; null for non-day buckets. */
@@ -13,6 +14,8 @@ export interface DateBucketDefinition {
 }
 
 export const DATE_BUCKET_PAST = 'date-past';
+export const DATE_BUCKET_LATER = 'date-later';
+export const DATE_BUCKET_NEXT_WEEK = 'date-next-week';
 export const DATE_BUCKET_SOON = 'date-soon';
 export const DATE_BUCKET_SOMEDAY = 'date-someday';
 export const DATE_BUCKET_UNDATED = 'date-undated';
@@ -23,9 +26,7 @@ export function createDefaultCollapsedSections(): Set<string> {
   return new Set([DATE_BUCKET_COMPLETED, 'gtd-completed', 'eisen-completed']);
 }
 
-/** Individual day buckets cover Today through today + 7 (8 buckets). */
-export const DAY_BUCKET_COUNT = 8;
-/** Soon covers +8 to +90 days; beyond that is Someday (matches GTD routing). */
+/** Soon covers the days after Next Week through today + 90; beyond that is Someday. */
 const SOON_MAX_DAYS = 90;
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -57,6 +58,57 @@ function daysBetween(fromStr: string, toStr: string): number {
   const fromMs = new Date(`${fromStr}T00:00:00Z`).getTime();
   const toMs = new Date(`${toStr}T00:00:00Z`).getTime();
   return Math.round((toMs - fromMs) / 86400000);
+}
+
+interface DateHorizonBoundaries {
+  laterStart: string;
+  laterEnd: string | null;
+  nextWeekStart: string;
+  nextWeekEnd: string;
+  soonStart: string;
+  soonEnd: string;
+  somedayStart: string;
+}
+
+function getDateHorizonBoundaries(todayStr: string): DateHorizonBoundaries {
+  const today = new Date(`${todayStr}T00:00:00Z`);
+  const utcDay = today.getUTCDay();
+  const daysUntilSunday = utcDay === 0 ? 0 : 7 - utcDay;
+  const laterStart = addDays(todayStr, 2);
+  const laterEnd = daysUntilSunday >= 2 ? addDays(todayStr, daysUntilSunday) : null;
+  const calendarNextWeekStart = addDays(todayStr, daysUntilSunday + 1);
+  const nextWeekStart = addDays(
+    todayStr,
+    Math.max(2, daysBetween(todayStr, calendarNextWeekStart))
+  );
+  const nextWeekEnd = addDays(todayStr, daysUntilSunday + 7);
+
+  return {
+    laterStart,
+    laterEnd,
+    nextWeekStart,
+    nextWeekEnd,
+    soonStart: addDays(nextWeekEnd, 1),
+    soonEnd: addDays(todayStr, SOON_MAX_DAYS),
+    somedayStart: addDays(todayStr, SOON_MAX_DAYS + 1)
+  };
+}
+
+function formatRangeLabel(start: string, end: string): string {
+  const startDate = new Date(`${start}T00:00:00Z`);
+  const endDate = new Date(`${end}T00:00:00Z`);
+  const startMonth = MONTHS[startDate.getUTCMonth()];
+  const endMonth = MONTHS[endDate.getUTCMonth()];
+  const startDay = startDate.getUTCDate();
+  const endDay = endDate.getUTCDate();
+  return startMonth === endMonth
+    ? `${startMonth} ${startDay}–${endDay}`
+    : `${startMonth} ${startDay}–${endMonth} ${endDay}`;
+}
+
+function formatIsoDay(dateStr: string): string {
+  const date = new Date(`${dateStr}T00:00:00Z`);
+  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}`;
 }
 
 function formatDayLabel(dateStr: string): { title: string; subtitle: string } {
@@ -91,58 +143,102 @@ export function getDateBucketId(
 
   const diff = daysBetween(todayStr, anchor);
   if (diff < 0) return DATE_BUCKET_PAST;
-  if (diff < DAY_BUCKET_COUNT) return dateBucketDayId(anchor);
-  if (diff <= SOON_MAX_DAYS) return DATE_BUCKET_SOON;
+  if (diff === 0) return dateBucketDayId(todayStr);
+
+  const tomorrow = addDays(todayStr, 1);
+  if (diff === 1) return dateBucketDayId(tomorrow);
+
+  const boundaries = getDateHorizonBoundaries(todayStr);
+  if (
+    boundaries.laterEnd &&
+    anchor >= boundaries.laterStart &&
+    anchor <= boundaries.laterEnd
+  ) {
+    return DATE_BUCKET_LATER;
+  }
+  if (anchor >= boundaries.nextWeekStart && anchor <= boundaries.nextWeekEnd) {
+    return DATE_BUCKET_NEXT_WEEK;
+  }
+  if (anchor >= boundaries.soonStart && anchor <= boundaries.soonEnd) {
+    return DATE_BUCKET_SOON;
+  }
   return DATE_BUCKET_SOMEDAY;
 }
 
-/** Chronological bucket list: Past | Today…+7 | Soon | Someday | Undated | Completed Today. */
 export function buildDateBuckets(todayStr: string): DateBucketDefinition[] {
-  const buckets: DateBucketDefinition[] = [
+  const tomorrow = addDays(todayStr, 1);
+  const boundaries = getDateHorizonBoundaries(todayStr);
+  return [
     {
       id: DATE_BUCKET_PAST,
-      title: 'Past — Overdue',
+      title: 'Past',
       subtitle: 'Anchor date before today.',
+      rangeLabel: null,
       badgeClass: 'badge-date-past',
       icon: 'alert-triangle',
       dayDate: null
-    }
-  ];
-
-  for (let i = 0; i < DAY_BUCKET_COUNT; i++) {
-    const date = addDays(todayStr, i);
-    const { title, subtitle } = formatDayLabel(date);
-    buckets.push({
-      id: dateBucketDayId(date),
-      title: i === 0 ? `Today — ${title}` : i === 1 ? `Tomorrow — ${title}` : title,
-      subtitle,
+    },
+    {
+      id: dateBucketDayId(todayStr),
+      title: 'Today',
+      subtitle: todayStr,
+      rangeLabel: null,
       badgeClass: 'badge-date-day',
       icon: 'calendar',
-      dayDate: date
-    });
-  }
-
-  buckets.push(
+      dayDate: todayStr
+    },
+    {
+      id: dateBucketDayId(tomorrow),
+      title: 'Tomorrow',
+      subtitle: tomorrow,
+      rangeLabel: null,
+      badgeClass: 'badge-date-day',
+      icon: 'calendar',
+      dayDate: tomorrow
+    },
+    {
+      id: DATE_BUCKET_LATER,
+      title: 'Later',
+      subtitle: 'After tomorrow through Sunday.',
+      rangeLabel: boundaries.laterEnd
+        ? formatRangeLabel(boundaries.laterStart, boundaries.laterEnd)
+        : null,
+      badgeClass: 'badge-date-later',
+      icon: 'calendar-days',
+      dayDate: null
+    },
+    {
+      id: DATE_BUCKET_NEXT_WEEK,
+      title: 'Next Week',
+      subtitle: 'The following Monday-to-Sunday week after tomorrow.',
+      rangeLabel: formatRangeLabel(boundaries.nextWeekStart, boundaries.nextWeekEnd),
+      badgeClass: 'badge-date-next-week',
+      icon: 'calendar-range',
+      dayDate: null
+    },
     {
       id: DATE_BUCKET_SOON,
-      title: 'Soon — Next 90 Days',
-      subtitle: 'Anchor date 8 to 90 days out.',
+      title: 'Soon',
+      subtitle: 'After next week through 90 days from today.',
+      rangeLabel: formatRangeLabel(boundaries.soonStart, boundaries.soonEnd),
       badgeClass: 'badge-date-soon',
       icon: 'clock',
       dayDate: null
     },
     {
       id: DATE_BUCKET_SOMEDAY,
-      title: 'Someday — Far Future',
-      subtitle: 'Anchor date more than 90 days out.',
+      title: 'Someday',
+      subtitle: 'Anchor date 91 or more days from today.',
+      rangeLabel: `${formatIsoDay(boundaries.somedayStart)} onward`,
       badgeClass: 'badge-date-someday',
       icon: 'archive',
       dayDate: null
     },
     {
       id: DATE_BUCKET_UNDATED,
-      title: 'Undated — No Dates Set',
+      title: 'Undated',
       subtitle: 'No scheduled, due, or start date.',
+      rangeLabel: null,
       badgeClass: 'badge-date-undated',
       icon: 'help-circle',
       dayDate: null
@@ -151,13 +247,12 @@ export function buildDateBuckets(todayStr: string): DateBucketDefinition[] {
       id: DATE_BUCKET_COMPLETED,
       title: 'Completed Today',
       subtitle: 'Tasks checked off today.',
+      rangeLabel: null,
       badgeClass: 'badge-done',
       icon: 'check-circle',
       dayDate: null
     }
-  );
-
-  return buckets;
+  ];
 }
 
 /** Buckets tasks by Anchor Date, pre-sorted per bucket for the renderers. */
@@ -165,7 +260,7 @@ export function groupByDateBucket(
   tasks: TaskItem[],
   anchorField: DateAnchorField,
   todayStr: string,
-  sortCriteria: SortCriteria
+  sortCriteria: SortCriteria = 'date'
 ): Map<string, TaskItem[]> {
   const grouped = new Map<string, TaskItem[]>();
   for (const bucket of buildDateBuckets(todayStr)) {

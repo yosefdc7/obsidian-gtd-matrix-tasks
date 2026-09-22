@@ -9,6 +9,8 @@ import {
   getDateBucketId,
   groupByDateBucket,
   DATE_BUCKET_COMPLETED,
+  DATE_BUCKET_LATER,
+  DATE_BUCKET_NEXT_WEEK,
   DATE_BUCKET_PAST,
   DATE_BUCKET_SOMEDAY,
   DATE_BUCKET_SOON,
@@ -17,6 +19,7 @@ import {
 import { DateAnchorField, TaskItem } from '../src/types';
 
 const TODAY = '2026-09-15';
+const HORIZON_TODAY = '2026-09-22';
 
 function makeTask(line: string, overrides: Partial<TaskItem> = {}): TaskItem {
   const task = parseTaskLine(line, 'Jots/2026/Sep/Sep 15 2026.md', 0);
@@ -52,20 +55,36 @@ describe('getAnchorDate', () => {
 describe('getDateBucketId', () => {
   const anchors: DateAnchorField = 'scheduled';
 
-  it('routes past, today, and +7 into their buckets', () => {
-    expect(getDateBucketId(makeTask('- [ ] A 📅 2026-09-14'), anchors, TODAY)).toBe(DATE_BUCKET_PAST);
-    expect(getDateBucketId(makeTask('- [ ] B 📅 2026-09-15'), anchors, TODAY)).toBe(
-      dateBucketDayId('2026-09-15')
-    );
-    expect(getDateBucketId(makeTask('- [ ] C 📅 2026-09-22'), anchors, TODAY)).toBe(
-      dateBucketDayId('2026-09-22')
-    );
+  it('routes every Tuesday horizon boundary without gaps', () => {
+    const cases: Array<[string, string]> = [
+      ['2026-09-21', DATE_BUCKET_PAST],
+      ['2026-09-22', dateBucketDayId('2026-09-22')],
+      ['2026-09-23', dateBucketDayId('2026-09-23')],
+      ['2026-09-24', DATE_BUCKET_LATER],
+      ['2026-09-27', DATE_BUCKET_LATER],
+      ['2026-09-28', DATE_BUCKET_NEXT_WEEK],
+      ['2026-10-04', DATE_BUCKET_NEXT_WEEK],
+      ['2026-10-05', DATE_BUCKET_SOON],
+      ['2026-12-21', DATE_BUCKET_SOON],
+      ['2026-12-22', DATE_BUCKET_SOMEDAY]
+    ];
+
+    for (const [date, expectedBucket] of cases) {
+      expect(getDateBucketId(makeTask(`- [ ] Task 📅 ${date}`), 'scheduled', HORIZON_TODAY))
+        .toBe(expectedBucket);
+    }
   });
 
-  it('routes +8 and +90 into Soon, +91 into Someday', () => {
-    expect(getDateBucketId(makeTask('- [ ] A 📅 2026-09-23'), anchors, TODAY)).toBe(DATE_BUCKET_SOON);
-    expect(getDateBucketId(makeTask('- [ ] B 📅 2026-12-14'), anchors, TODAY)).toBe(DATE_BUCKET_SOON);
-    expect(getDateBucketId(makeTask('- [ ] C 📅 2026-12-15'), anchors, TODAY)).toBe(DATE_BUCKET_SOMEDAY);
+  it('gives Tomorrow precedence over Next Week when Today is Sunday', () => {
+    const sunday = '2026-09-27';
+    expect(getDateBucketId(makeTask('- [ ] Monday 📅 2026-09-28'), 'scheduled', sunday))
+      .toBe(dateBucketDayId('2026-09-28'));
+    expect(getDateBucketId(makeTask('- [ ] Tuesday 📅 2026-09-29'), 'scheduled', sunday))
+      .toBe(DATE_BUCKET_NEXT_WEEK);
+    expect(getDateBucketId(makeTask('- [ ] Sunday 📅 2026-10-04'), 'scheduled', sunday))
+      .toBe(DATE_BUCKET_NEXT_WEEK);
+    expect(getDateBucketId(makeTask('- [ ] Following Monday 📅 2026-10-05'), 'scheduled', sunday))
+      .toBe(DATE_BUCKET_SOON);
   });
 
   it('routes dateless tasks into Undated', () => {
@@ -81,48 +100,49 @@ describe('getDateBucketId', () => {
 
   it('respects the chosen anchor field', () => {
     const task = makeTask('- [ ] A ⏳ 2026-09-20 🛫 2026-09-11');
-    expect(getDateBucketId(task, 'scheduled', TODAY)).toBe(dateBucketDayId('2026-09-20'));
+    expect(getDateBucketId(task, 'scheduled', TODAY)).toBe(DATE_BUCKET_LATER);
     expect(getDateBucketId(task, 'start', TODAY)).toBe(DATE_BUCKET_PAST);
   });
 });
 
 describe('buildDateBuckets', () => {
-  it('builds 13 buckets in chronological order', () => {
-    const buckets = buildDateBuckets(TODAY);
-    expect(buckets).toHaveLength(13);
-    expect(buckets[0].id).toBe(DATE_BUCKET_PAST);
-
-    const dayDates = buckets.slice(1, 9).map((b) => b.dayDate);
-    expect(dayDates).toEqual([
-      '2026-09-15',
-      '2026-09-16',
-      '2026-09-17',
-      '2026-09-18',
-      '2026-09-19',
-      '2026-09-20',
-      '2026-09-21',
-      '2026-09-22'
+  it('builds nine buckets in the approved order with visible range labels', () => {
+    const buckets = buildDateBuckets(HORIZON_TODAY);
+    expect(buckets.map((bucket) => bucket.id)).toEqual([
+      DATE_BUCKET_PAST,
+      dateBucketDayId('2026-09-22'),
+      dateBucketDayId('2026-09-23'),
+      DATE_BUCKET_LATER,
+      DATE_BUCKET_NEXT_WEEK,
+      DATE_BUCKET_SOON,
+      DATE_BUCKET_SOMEDAY,
+      DATE_BUCKET_UNDATED,
+      DATE_BUCKET_COMPLETED
     ]);
-
-    expect(buckets[9].id).toBe(DATE_BUCKET_SOON);
-    expect(buckets[10].id).toBe(DATE_BUCKET_SOMEDAY);
-    expect(buckets[11].id).toBe(DATE_BUCKET_UNDATED);
-    expect(buckets[12].id).toBe(DATE_BUCKET_COMPLETED);
+    expect(buckets.map((bucket) => bucket.rangeLabel)).toEqual([
+      null,
+      null,
+      null,
+      'Sep 24–27',
+      'Sep 28–Oct 4',
+      'Oct 5–Dec 21',
+      'Dec 22 onward',
+      null,
+      null
+    ]);
   });
 
-  it('labels the first two day buckets Today and Tomorrow', () => {
-    const buckets = buildDateBuckets(TODAY);
-    expect(buckets[1].title.startsWith('Today')).toBe(true);
-    expect(buckets[2].title.startsWith('Tomorrow')).toBe(true);
-    expect(buckets[3].title.startsWith('Thu')).toBe(true);
+  it('shrinks the Sunday Next Week label after Tomorrow takes Monday', () => {
+    const buckets = buildDateBuckets('2026-09-27');
+    expect(buckets.find((bucket) => bucket.id === DATE_BUCKET_LATER)?.rangeLabel).toBeNull();
+    expect(buckets.find((bucket) => bucket.id === DATE_BUCKET_NEXT_WEEK)?.rangeLabel)
+      .toBe('Sep 29–Oct 4');
   });
 
-  it('marks only day buckets as drop targets', () => {
-    const buckets = buildDateBuckets(TODAY);
-    const droppable = buckets.filter((b) => b.dayDate !== null);
-    expect(droppable).toHaveLength(8);
-    expect(buckets[0].dayDate).toBeNull();
-    expect(buckets[12].dayDate).toBeNull();
+  it('marks only Today and Tomorrow as exact-date drop targets', () => {
+    const buckets = buildDateBuckets(HORIZON_TODAY);
+    expect(buckets.filter((bucket) => bucket.dayDate !== null).map((bucket) => bucket.dayDate))
+      .toEqual(['2026-09-22', '2026-09-23']);
   });
 
   it('identifies only Today and Tomorrow for restrained header emphasis', () => {
@@ -154,16 +174,11 @@ describe('groupByDateBucket', () => {
     const doneToday = makeTask('- [x] Done ✅ 2026-09-15');
     const doneOld = makeTask('- [x] Ancient ✅ 2026-08-01');
 
-    const grouped = groupByDateBucket(
-      [later, sooner, overdue, undated, doneToday, doneOld],
-      'scheduled',
-      TODAY,
-      'date'
-    );
+    const grouped = groupByDateBucket([later, sooner, overdue, undated, doneToday, doneOld], 'scheduled', TODAY);
 
-    expect(grouped.size).toBe(13);
+    expect(grouped.size).toBe(9);
     expect(grouped.get(dateBucketDayId('2026-09-16'))).toEqual([sooner]);
-    expect(grouped.get(dateBucketDayId('2026-09-18'))).toEqual([later]);
+    expect(grouped.get(DATE_BUCKET_LATER)).toEqual([later]);
     expect(grouped.get(DATE_BUCKET_PAST)).toEqual([overdue]);
     expect(grouped.get(DATE_BUCKET_UNDATED)).toEqual([undated]);
     expect(grouped.get(DATE_BUCKET_COMPLETED)).toEqual([doneToday]);
@@ -175,16 +190,16 @@ describe('groupByDateBucket', () => {
   it('sorts within a bucket by the sort criteria', () => {
     const lowPrio = makeTask('- [ ] Low 📅 2026-09-17');
     const highPrio = makeTask('- [ ] High 📅 2026-09-17 ⏫');
-    const grouped = groupByDateBucket([lowPrio, highPrio], 'scheduled', TODAY, 'priority');
-    expect(grouped.get(dateBucketDayId('2026-09-17'))).toEqual([highPrio, lowPrio]);
+    const grouped = groupByDateBucket([lowPrio, highPrio], 'scheduled', TODAY);
+    expect(grouped.get(DATE_BUCKET_LATER)).toEqual([lowPrio, highPrio]);
   });
 
   it('moves tasks between buckets when the anchor field changes', () => {
     const task = makeTask('- [ ] A ⏳ 2026-09-20 🛫 2026-09-10');
-    const byScheduled = groupByDateBucket([task], 'scheduled', TODAY, 'date');
-    expect(byScheduled.get(dateBucketDayId('2026-09-20'))).toEqual([task]);
+    const byScheduled = groupByDateBucket([task], 'scheduled', TODAY);
+    expect(byScheduled.get(DATE_BUCKET_LATER)).toEqual([task]);
 
-    const byStart = groupByDateBucket([task], 'start', TODAY, 'date');
+    const byStart = groupByDateBucket([task], 'start', TODAY);
     expect(byStart.get(DATE_BUCKET_PAST)).toEqual([task]);
   });
 });
