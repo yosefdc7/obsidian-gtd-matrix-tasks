@@ -76,6 +76,12 @@ export function ensureTodoistIdentity(
   return `${line.trimEnd()} <!-- ${JSON.stringify({ uuid: defaultUuid, todoistId })} -->`;
 }
 
+export function resolveTodoistDueDate(task: TaskItem): string | undefined {
+  // Option A: Start date (🛫) takes precedence so tasks alert when work begins.
+  // Fallback order: startDate ?? scheduledDate ?? dueDate
+  return (task.startDate ?? task.scheduledDate ?? task.dueDate) ?? undefined;
+}
+
 export function planTodoistReconciliation(
   localTasks: TaskItem[],
   remoteTasks: TodoistTask[],
@@ -109,7 +115,7 @@ export function planTodoistReconciliation(
           // Compare content, due date, priority
           const expectedTitle = cleanTodoistTaskTitle(task.description);
           const expectedPrio = mapTaskPriorityToTodoist(task.priority);
-          const expectedDueDate = task.dueDate ?? undefined;
+          const expectedDueDate = resolveTodoistDueDate(task);
           const remoteDueDate = remote.due?.date;
 
           if (

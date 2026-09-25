@@ -151,4 +151,43 @@ describe('Todoist Reconciliation Planning', () => {
     const plan = planTodoistReconciliation(completedLocal, remote);
     expect(plan.closeTodoistIds).toEqual(['tod_200']);
   });
+
+  it('detects missing due date in Todoist for tasks with startDate and schedules update', () => {
+    const local = [
+      task({
+        rawText: '- [ ] need headset 🛫 2026-09-27 <!-- {"uuid":"111","todoistId":"tod_headset"} -->',
+        description: 'need headset',
+        startDate: '2026-09-27',
+        dueDate: null,
+        scheduledDate: null,
+      }),
+    ];
+    // Remote task exists in Todoist but has no due date (due: null)
+    const remote: TodoistTask[] = [
+      {
+        id: 'tod_headset',
+        project_id: 'proj_inbox',
+        content: 'need headset',
+        is_completed: false,
+        priority: 1,
+        due: null,
+      },
+    ];
+
+    const plan = planTodoistReconciliation(local, remote);
+    expect(plan.update).toHaveLength(1);
+    expect(plan.update[0].todoistId).toBe('tod_headset');
+    expect(plan.update[0].task.startDate).toBe('2026-09-27');
+  });
 });
+
+describe('Todoist Date Resolution (Option A)', () => {
+  it('prefers startDate over scheduledDate and dueDate', () => {
+    const { resolveTodoistDueDate } = require('../src/todoist/todoist-sync-core');
+    expect(resolveTodoistDueDate(task({ startDate: '2026-09-27', dueDate: '2026-09-30' }))).toBe('2026-09-27');
+    expect(resolveTodoistDueDate(task({ startDate: null, scheduledDate: '2026-09-27', dueDate: '2026-09-30' }))).toBe('2026-09-27');
+    expect(resolveTodoistDueDate(task({ startDate: null, scheduledDate: null, dueDate: '2026-09-30' }))).toBe('2026-09-30');
+    expect(resolveTodoistDueDate(task({ startDate: null, scheduledDate: null, dueDate: null }))).toBe(undefined);
+  });
+});
+

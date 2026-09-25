@@ -11,6 +11,7 @@ import {
   mapTaskPriorityToTodoist,
   planTodoistReconciliation,
   resolveFacetProjectName,
+  resolveTodoistDueDate,
 } from './todoist-sync-core';
 import { setTaskCompletion } from '../parser';
 
@@ -175,7 +176,7 @@ export class TodoistSyncController {
         const created = await client.createTask({
           content: title,
           project_id: targetProjectId,
-          due_date: task.dueDate ?? undefined,
+          due_date: resolveTodoistDueDate(task),
           priority,
           description,
         });
@@ -199,7 +200,7 @@ export class TodoistSyncController {
         await client.updateTask(todoistId, {
           content: title,
           project_id: targetProjectId,
-          due_date: task.dueDate ?? undefined,
+          due_date: resolveTodoistDueDate(task),
           priority,
         });
         updatedCount++;
