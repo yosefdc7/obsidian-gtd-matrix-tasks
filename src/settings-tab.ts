@@ -159,19 +159,32 @@ export class GTDMatrixSettingTab extends PluginSettingTab {
           this.display();
         }));
 
-    new Setting(containerEl)
+    const tokenSetting = new Setting(containerEl)
       .setName('Todoist API token')
-      .setDesc('Personal API token from Todoist Settings > Integrations > Developer.')
-      .addText((text) => {
-        text.inputEl.type = 'password';
-        text
-          .setPlaceholder('Enter Todoist API token...')
-          .setValue(this.plugin.settings.todoistApiToken)
-          .onChange(async (value) => {
-            this.plugin.settings.todoistApiToken = value.trim();
-            await this.plugin.saveSettings();
+      .setDesc('Personal API token from Todoist Settings > Integrations > Developer.');
+
+    let isTokenMasked = true;
+    tokenSetting.addText((text) => {
+      text.inputEl.type = 'password';
+      text
+        .setPlaceholder('Enter Todoist API token...')
+        .setValue(this.plugin.settings.todoistApiToken)
+        .onChange(async (value) => {
+          this.plugin.settings.todoistApiToken = value.trim();
+          await this.plugin.saveSettings();
+        });
+
+      tokenSetting.addExtraButton((btn) => {
+        btn
+          .setIcon('eye')
+          .setTooltip('Toggle token visibility')
+          .onClick(() => {
+            isTokenMasked = !isTokenMasked;
+            text.inputEl.type = isTokenMasked ? 'password' : 'text';
+            btn.setIcon(isTokenMasked ? 'eye' : 'eye-off');
           });
       });
+    });
 
     new Setting(containerEl)
       .setName('Default project')

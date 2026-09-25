@@ -3,11 +3,11 @@ import type { HttpTransport } from '../src/calendar/google-calendar-client';
 import { TodoistClient } from '../src/todoist/todoist-client';
 
 describe('TodoistClient', () => {
-  it('sends Bearer authorization header and fetches projects', async () => {
+  it('sends Bearer authorization header and fetches projects from API v1', async () => {
     const transport: HttpTransport = {
       request: vi.fn().mockResolvedValue({
         status: 200,
-        json: [{ id: 'proj_1', name: 'Yo the Manager' }],
+        json: { results: [{ id: 'proj_1', name: 'Yo the Manager' }] },
         text: '',
       }),
     };
@@ -17,7 +17,7 @@ describe('TodoistClient', () => {
 
     expect(projects).toEqual([{ id: 'proj_1', name: 'Yo the Manager' }]);
     expect(transport.request).toHaveBeenCalledWith({
-      url: 'https://api.todoist.com/rest/v2/projects',
+      url: 'https://api.todoist.com/api/v1/projects',
       method: 'GET',
       headers: {
         Authorization: 'Bearer test_token',
@@ -30,7 +30,7 @@ describe('TodoistClient', () => {
     const transport: HttpTransport = {
       request: vi.fn().mockResolvedValue({
         status: 200,
-        json: { id: 'tod_1', content: 'Buy milk', priority: 4, is_completed: false, project_id: 'proj_1' },
+        json: { id: 'tod_1', content: 'Buy milk', priority: 4, checked: false, project_id: 'proj_1' },
         text: '',
       }),
     };
@@ -45,7 +45,7 @@ describe('TodoistClient', () => {
 
     expect(task.id).toBe('tod_1');
     expect(transport.request).toHaveBeenCalledWith({
-      url: 'https://api.todoist.com/rest/v2/tasks',
+      url: 'https://api.todoist.com/api/v1/tasks',
       method: 'POST',
       headers: {
         Authorization: 'Bearer test_token',
@@ -73,7 +73,7 @@ describe('TodoistClient', () => {
     await client.closeTask('tod_1');
 
     expect(transport.request).toHaveBeenCalledWith({
-      url: 'https://api.todoist.com/rest/v2/tasks/tod_1/close',
+      url: 'https://api.todoist.com/api/v1/tasks/tod_1/close',
       method: 'POST',
       headers: {
         Authorization: 'Bearer test_token',

@@ -7,7 +7,7 @@ import type {
 } from './todoist-types';
 
 export class TodoistClient {
-  private readonly baseUrl = 'https://api.todoist.com/rest/v2';
+  private readonly baseUrl = 'https://api.todoist.com/api/v1';
 
   constructor(
     private readonly apiToken: string,
@@ -45,16 +45,35 @@ export class TodoistClient {
   }
 
   async getProjects(): Promise<TodoistProject[]> {
-    return this.request<TodoistProject[]>('/projects');
+    const res = await this.request<{ results?: TodoistProject[] } | TodoistProject[]>('/projects');
+    if (Array.isArray(res)) return res;
+    if (res && Array.isArray((res as { results?: TodoistProject[] }).results)) {
+      return (res as { results: TodoistProject[] }).results;
+    }
+    return [];
   }
 
   async createProject(name: string): Promise<TodoistProject> {
-    return this.request<TodoistProject[]>('/projects', 'POST', { name }) as unknown as Promise<TodoistProject>;
+    return this.request<TodoistProject>('/projects', 'POST', { name });
   }
 
   async getTasks(filter?: string): Promise<TodoistTask[]> {
     const query = filter ? `?filter=${encodeURIComponent(filter)}` : '';
-    return this.request<TodoistTask[]>(`/tasks${query}`);
+    const res = await this.request<{ results?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>>(
+      `/tasks${query}`
+    );
+    const list = Array.isArray(res) ? res : res?.results ?? [];
+    return list.map((t) => ({
+      id: String(t.id),
+      project_id: String(t.project_id),
+      content: String(t.content ?? ''),
+      description: typeof t.description === 'string' ? t.description : undefined,
+      is_completed: Boolean(t.checked ?? t.is_completed),
+      due: (t.due as TodoistTask['due']) ?? null,
+      priority: typeof t.priority === 'number' ? t.priority : 1,
+      parent_id: t.parent_id ? String(t.parent_id) : null,
+      labels: Array.isArray(t.labels) ? (t.labels as string[]) : [],
+    }));
   }
 
   async createTask(params: CreateTodoistTaskParams): Promise<TodoistTask> {
