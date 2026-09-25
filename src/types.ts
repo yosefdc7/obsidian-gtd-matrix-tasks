@@ -104,6 +104,10 @@ export interface PluginSettings {
   calendarDefaultStartTime: string;
   calendarDefaultDurationMinutes: number;
   calendarTimeZone: string;
+  todoistSyncEnabled: boolean;
+  todoistApiToken: string;
+  todoistDefaultProject: string;
+  todoistSyncIntervalMinutes: number;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -142,5 +146,9 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   calendarDefaultStartTime: '07:00',
   calendarDefaultDurationMinutes: 30,
   calendarTimeZone: 'Asia/Singapore',
+  todoistSyncEnabled: false,
+  todoistApiToken: '',
+  todoistDefaultProject: 'Inbox',
+  todoistSyncIntervalMinutes: 5,
 };
 

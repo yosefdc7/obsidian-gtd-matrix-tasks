@@ -145,6 +145,76 @@ export class GTDMatrixSettingTab extends PluginSettingTab {
         this.plugin.calendarSync.schedule();
       }));
 
+    containerEl.createEl('h3', { text: 'Todoist 3-Facet Projection' });
+
+    new Setting(containerEl)
+      .setName('Enable Todoist sync')
+      .setDesc('Projects open tasks to your 3 identity facet projects (Yo the Manager, Josef with Self Care, RJ the Supportive) in Todoist.')
+      .addToggle((toggle) => toggle
+        .setValue(this.plugin.settings.todoistSyncEnabled)
+        .onChange(async (value) => {
+          this.plugin.settings.todoistSyncEnabled = value;
+          await this.plugin.saveSettings();
+          if (value) this.plugin.todoistSync?.schedule(0);
+          this.display();
+        }));
+
+    new Setting(containerEl)
+      .setName('Todoist API token')
+      .setDesc('Personal API token from Todoist Settings > Integrations > Developer.')
+      .addText((text) => {
+        text.inputEl.type = 'password';
+        text
+          .setPlaceholder('Enter Todoist API token...')
+          .setValue(this.plugin.settings.todoistApiToken)
+          .onChange(async (value) => {
+            this.plugin.settings.todoistApiToken = value.trim();
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName('Default project')
+      .setDesc('Fallback Todoist project for untagged / general tasks.')
+      .addText((text) => text
+        .setPlaceholder('Inbox')
+        .setValue(this.plugin.settings.todoistDefaultProject)
+        .onChange(async (value) => {
+          this.plugin.settings.todoistDefaultProject = value.trim() || 'Inbox';
+          await this.plugin.saveSettings();
+        }));
+
+    const todoistStatus = this.plugin.todoistSync?.getStatus();
+    new Setting(containerEl)
+      .setName('Connection & synchronization')
+      .setDesc(todoistStatus?.lastError
+        ? `Error: ${todoistStatus.lastError}`
+        : todoistStatus?.lastSuccess
+          ? `Last successful sync: ${new Date(todoistStatus.lastSuccess).toLocaleString()}`
+          : `Status: ${todoistStatus?.state ?? 'not initialized'}`)
+      .addButton((button) => button
+        .setButtonText('Test connection')
+        .onClick(async () => {
+          button.setDisabled(true);
+          button.setButtonText('Testing...');
+          const res = await this.plugin.todoistSync.testConnection();
+          button.setDisabled(false);
+          button.setButtonText('Test connection');
+          if (res.success) {
+            new Notice(`Connected to Todoist! Found ${res.projects.length} projects: ${res.projects.slice(0, 4).join(', ')}...`);
+          } else {
+            new Notice(`Todoist connection failed: ${res.message || 'Unknown error'}`);
+          }
+          this.display();
+        }))
+      .addButton((button) => button
+        .setButtonText('Sync now')
+        .setCta()
+        .onClick(async () => {
+          await this.plugin.todoistSync.syncNow(true);
+          this.display();
+        }));
+
     containerEl.createEl('h3', { text: 'Task view' });
 
     new Setting(containerEl)

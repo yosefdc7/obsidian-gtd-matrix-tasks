@@ -8,6 +8,7 @@ import { AutoMover } from './auto-mover';
 import { reconcileNoteContent, isWithinActiveWindow } from './context-linker';
 import { HoverManager } from './hover-manager';
 import { CalendarSyncController } from './calendar/controller';
+import { TodoistSyncController } from './todoist/controller';
 
 export default class GTDMatrixPlugin extends Plugin {
   public settings: PluginSettings = DEFAULT_SETTINGS;
@@ -15,6 +16,7 @@ export default class GTDMatrixPlugin extends Plugin {
   public autoMover: AutoMover = null!;
   public hoverManager: HoverManager = null!;
   public calendarSync: CalendarSyncController = null!;
+  public todoistSync: TodoistSyncController = null!;
   public lastActiveFile: TFile | null = null;
 
   async onload(): Promise<void> {
@@ -26,6 +28,8 @@ export default class GTDMatrixPlugin extends Plugin {
     this.hoverManager = new HoverManager(this.app, this.settings);
     this.calendarSync = new CalendarSyncController(this.app, this.scanner, () => this.settings);
     this.calendarSync.start();
+    this.todoistSync = new TodoistSyncController(this.app, this.scanner, () => this.settings);
+    this.todoistSync.start();
 
     this.registerObsidianProtocolHandler('gtd-calendar-auth', (params) => {
       void this.calendarSync.handleOAuthCallback(params).catch((error) => {
@@ -78,6 +82,12 @@ export default class GTDMatrixPlugin extends Plugin {
       id: 'sync-google-calendar-now',
       name: 'Sync Google Calendar now',
       callback: () => void this.calendarSync.syncNow(true)
+    });
+
+    this.addCommand({
+      id: 'sync-todoist-now',
+      name: 'Sync Todoist now',
+      callback: () => void this.todoistSync.syncNow(true)
     });
 
     this.addSettingTab(new GTDMatrixSettingTab(this.app, this));
@@ -305,6 +315,7 @@ export default class GTDMatrixPlugin extends Plugin {
 
   onunload(): void {
     this.calendarSync?.stop();
+    this.todoistSync?.stop();
     void this.scanner?.saveSnapshot();
     this.hoverManager?.destroy();
     this.app.workspace.iterateAllLeaves((leaf: WorkspaceLeaf) => {
