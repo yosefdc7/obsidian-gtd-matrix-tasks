@@ -82,6 +82,31 @@ describe('TodoistClient', () => {
     });
   });
 
+  it('moves task to parent via /tasks/{id}/move', async () => {
+    const transport: HttpTransport = {
+      request: vi.fn().mockResolvedValue({
+        status: 200,
+        json: { id: 'child_1', parent_id: 'parent_1' },
+        text: '',
+      }),
+    };
+
+    const client = new TodoistClient('test_token', transport);
+    const moved = await client.moveTask('child_1', { parent_id: 'parent_1' });
+
+    expect(moved.id).toBe('child_1');
+    expect(moved.parent_id).toBe('parent_1');
+    expect(transport.request).toHaveBeenCalledWith({
+      url: 'https://api.todoist.com/api/v1/tasks/child_1/move',
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer test_token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ parent_id: 'parent_1' }),
+    });
+  });
+
   it('throws descriptive error on 401 or 429 status', async () => {
     const transport: HttpTransport = {
       request: vi.fn().mockResolvedValue({

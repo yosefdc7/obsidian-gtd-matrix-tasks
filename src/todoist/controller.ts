@@ -5,8 +5,10 @@ import { ObsidianHttpTransport } from '../calendar/obsidian-http';
 import { TodoistClient } from './todoist-client';
 import type { TodoistProject, TodoistSyncStatus, TodoistTask } from './todoist-types';
 import {
+  buildTodoistTaskDescription,
   cleanTodoistTaskTitle,
   ensureTodoistIdentity,
+  extractTodoistId,
   isTodoistEligible,
   mapTaskPriorityToTodoist,
   planTodoistReconciliation,
@@ -130,10 +132,12 @@ export class TodoistSyncController {
       const localTasks = this.scanner.getTasks();
 
       // 4. Calculate reconciliation plan
+      const vaultName = this.app.vault.getName();
       const plan = planTodoistReconciliation(
         localTasks,
         remoteTasks,
-        settings.todoistDefaultProject || 'Inbox'
+        settings.todoistDefaultProject || 'Inbox',
+        vaultName
       );
 
       let createdCount = 0;
@@ -162,16 +166,33 @@ export class TodoistSyncController {
       }
 
       // 7. Apply plan: Create new open tasks in Todoist
+      const createdIdMap = new Map<string, string>();
+      const localTaskById = new Map<string, TaskItem>();
+      for (const t of localTasks) {
+        localTaskById.set(t.id, t);
+      }
+
       for (const { task, projectName } of plan.create) {
         const targetProjectId = await ensureProject(projectName);
         const title = cleanTodoistTaskTitle(task.description);
         if (!title) continue;
 
         const priority = mapTaskPriorityToTodoist(task.priority);
-        const vaultName = this.app.vault.getName();
-        const description = `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(
-          task.filePath
-        )}\n\nManaged by GTD Matrix Tasks.`;
+        const description = buildTodoistTaskDescription(task, vaultName);
+
+        // Resolve parent_id if this is an indented child subtask
+        let parentTodoistId: string | undefined = undefined;
+        if (task.parentTaskId) {
+          if (createdIdMap.has(task.parentTaskId)) {
+            parentTodoistId = createdIdMap.get(task.parentTaskId);
+          } else {
+            const parent = localTaskById.get(task.parentTaskId);
+            if (parent) {
+              const id = extractTodoistId(parent.rawText);
+              if (id) parentTodoistId = id;
+            }
+          }
+        }
 
         const created = await client.createTask({
           content: title,
@@ -179,7 +200,10 @@ export class TodoistSyncController {
           due_date: resolveTodoistDueDate(task),
           priority,
           description,
+          parent_id: parentTodoistId,
         });
+
+        createdIdMap.set(task.id, created.id);
 
         // Write todoistId back into Obsidian markdown task line
         await this.scanner.updateTaskLine(
@@ -196,14 +220,27 @@ export class TodoistSyncController {
         const targetProjectId = await ensureProject(projectName);
         const title = cleanTodoistTaskTitle(task.description);
         const priority = mapTaskPriorityToTodoist(task.priority);
+        const description = buildTodoistTaskDescription(task, vaultName);
 
         await client.updateTask(todoistId, {
           content: title,
           project_id: targetProjectId,
           due_date: resolveTodoistDueDate(task),
           priority,
+          description,
         });
         updatedCount++;
+      }
+
+      // 9. Apply plan: Move tasks to link under parent tasks if needed
+      if (plan.move) {
+        for (const { todoistId, parentId } of plan.move) {
+          try {
+            await client.moveTask(todoistId, { parent_id: parentId });
+          } catch (err) {
+            console.warn(`[GTD Todoist Sync] Failed to move task ${todoistId} to parent ${parentId}:`, err);
+          }
+        }
       }
 
       this.status = {

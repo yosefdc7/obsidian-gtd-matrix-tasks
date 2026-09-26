@@ -35,6 +35,7 @@ export interface TodoistSyncStatus {
 export interface TodoistReconciliationPlan {
   create: Array<{ task: TaskItem; projectName: string }>;
   update: Array<{ todoistId: string; task: TaskItem; projectName: string }>;
+  move?: Array<{ todoistId: string; parentId: string }>;
   closeTodoistIds: string[];
   completeLocalTasks: Array<{ task: TaskItem }>;
 }

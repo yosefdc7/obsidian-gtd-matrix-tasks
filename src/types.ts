@@ -66,6 +66,10 @@ export interface TaskItem {
   linkedNotes: string[];
   effectiveRole: RoleId;
   roleSource: 'inline' | 'linked-note' | 'parent-note' | 'none';
+  parentLineNumber?: number | null;
+  parentTaskId?: string | null;
+  childNotes?: string;
+  childNotesLines?: string[];
 }
 
 export interface SectionDefinition {

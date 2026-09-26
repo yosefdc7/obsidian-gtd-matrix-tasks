@@ -84,6 +84,10 @@ export class TodoistClient {
     return this.request<TodoistTask>(`/tasks/${id}`, 'POST', params);
   }
 
+  async moveTask(id: string, params: { parent_id?: string; project_id?: string; section_id?: string }): Promise<TodoistTask> {
+    return this.request<TodoistTask>(`/tasks/${id}/move`, 'POST', params);
+  }
+
   async closeTask(id: string): Promise<void> {
     await this.request<void>(`/tasks/${id}/close`, 'POST');
   }

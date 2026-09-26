@@ -16,13 +16,14 @@ const ROLE_TAG_REGEX = /#role\/[a-zA-Z0-9_-]+/g;
 const HIDDEN_COMMENT_REGEX = /<!--.*?-->/g;
 
 export function parseTaskLine(line: string, filePath: string, lineNumber: number): TaskItem | null {
-  const match = line.match(TASK_REGEX);
+  const cleanLine = line.replace(/\r$/, '');
+  const match = cleanLine.match(TASK_REGEX);
   if (!match) return null;
 
   const prefix = match[1];
   const statusChar = match[2];
   const body = match[4];
-  const indent = line.slice(0, line.indexOf(prefix.trim()));
+  const indent = cleanLine.slice(0, cleanLine.indexOf(prefix.trim()));
 
   const isCompleted = statusChar.toLowerCase() === 'x';
 
@@ -628,5 +629,115 @@ export function sortTasks(tasks: TaskItem[], criteria: SortCriteria): TaskItem[]
     default:
       return list;
   }
+}
+
+export function getIndentWidth(line: string): number {
+  let count = 0;
+  for (const ch of line) {
+    if (ch === ' ') count += 1;
+    else if (ch === '\t') count += 4;
+    else break;
+  }
+  return count;
+}
+
+export function parseFileTasks(lines: string[], filePath: string): TaskItem[] {
+  const tasks: TaskItem[] = [];
+  const stack: { task: TaskItem; indentWidth: number }[] = [];
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const rawLine = lines[lineIdx].replace(/\r$/, '');
+
+    // Markdown headings (#, ##, etc.) reset the task outline stack
+    if (/^#{1,6}\s/.test(rawLine.trimStart())) {
+      stack.length = 0;
+      continue;
+    }
+
+    const task = parseTaskLine(rawLine, filePath, lineIdx);
+    if (task) {
+      const lineIndent = getIndentWidth(rawLine);
+
+      // Pop stack entries that are at or deeper than current task's indent level
+      while (stack.length > 0 && stack[stack.length - 1].indentWidth >= lineIndent) {
+        stack.pop();
+      }
+
+      // If stack has an entry, that entry is this task's immediate parent
+      if (stack.length > 0) {
+        const parent = stack[stack.length - 1].task;
+        task.parentLineNumber = parent.lineNumber;
+        task.parentTaskId = parent.id;
+      }
+
+      tasks.push(task);
+      stack.push({ task, indentWidth: lineIndent });
+    } else if (rawLine.trim().length > 0 && stack.length > 0) {
+      const lineIndent = getIndentWidth(rawLine);
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (stack[i].indentWidth < lineIndent) {
+          const parent = stack[i].task;
+          if (!parent.childNotesLines) {
+            parent.childNotesLines = [];
+          }
+          if (parent.childNotesLines.length < 50) {
+            const parentWidth = stack[i].indentWidth;
+            let stripped = 0;
+            let idx = 0;
+            while (idx < rawLine.length && stripped < parentWidth) {
+              if (rawLine[idx] === ' ') {
+                stripped += 1;
+                idx += 1;
+              } else if (rawLine[idx] === '\t') {
+                stripped += 4;
+                idx += 1;
+              } else {
+                break;
+              }
+            }
+            parent.childNotesLines.push(rawLine.slice(idx));
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  for (const t of tasks) {
+    if (t.childNotesLines && t.childNotesLines.length > 0) {
+      const nonEmptyLines = t.childNotesLines.filter((l) => l.trim().length > 0);
+      let minIndent = Infinity;
+      for (const l of nonEmptyLines) {
+        const w = getIndentWidth(l) - getIndentWidth(l.trimStart());
+        if (w < minIndent) minIndent = w;
+      }
+
+      if (minIndent > 0 && Number.isFinite(minIndent)) {
+        t.childNotes = t.childNotesLines
+          .map((l) => {
+            if (l.trim().length === 0) return '';
+            let stripped = 0;
+            let idx = 0;
+            while (idx < l.length && stripped < minIndent) {
+              if (l[idx] === ' ') {
+                stripped += 1;
+                idx += 1;
+              } else if (l[idx] === '\t') {
+                stripped += 4;
+                idx += 1;
+              } else {
+                break;
+              }
+            }
+            return l.slice(idx);
+          })
+          .join('\n');
+      } else {
+        t.childNotes = t.childNotesLines.join('\n');
+      }
+    }
+  }
+
+  return tasks;
 }
 

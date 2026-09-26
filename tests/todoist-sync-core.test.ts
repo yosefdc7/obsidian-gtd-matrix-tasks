@@ -191,3 +191,87 @@ describe('Todoist Date Resolution (Option A)', () => {
   });
 });
 
+describe('Todoist Task Description & Child Notes', () => {
+  const {
+    cleanTodoistDescription,
+    buildTodoistTaskDescription,
+  } = require('../src/todoist/todoist-sync-core');
+
+  it('cleans wikilinks and hidden comments in child notes', () => {
+    const raw = '- Check [[Executive Dashboard|Exec Dash]] specs <!-- comment -->\n- Follow up on [[Partner Reliability]]';
+    const cleaned = cleanTodoistDescription(raw);
+    expect(cleaned).toBe('- Check Exec Dash specs\n- Follow up on Partner Reliability');
+  });
+
+  it('caps child notes at 50 lines max and adds truncation notice', () => {
+    const lines = Array.from({ length: 60 }, (_, i) => `- Note line ${i + 1}`).join('\n');
+    const cleaned = cleanTodoistDescription(lines, 50, 5000);
+    const lineCount = cleaned.split('\n').length;
+    expect(lineCount).toBe(51); // 50 lines + truncation notice
+    expect(cleaned).toContain('... (truncated)');
+  });
+
+  it('builds full description with child notes and deep link footer', () => {
+    const t = task({
+      childNotes: '- Note A\n- Note B',
+    });
+    const desc = buildTodoistTaskDescription(t, '2nd Brain');
+    expect(desc).toContain('- Note A\n- Note B');
+    expect(desc).toContain('---');
+    expect(desc).toContain('🔗 [Open in Obsidian](obsidian://open?vault=2nd%20Brain&file=Jots%2F2026%2FSep%2FSep%2026%202026.md)');
+  });
+
+  it('builds link-only description when task has no child notes', () => {
+    const t = task({ childNotes: undefined });
+    const desc = buildTodoistTaskDescription(t, '2nd Brain');
+    expect(desc).toBe('🔗 [Open in Obsidian](obsidian://open?vault=2nd%20Brain&file=Jots%2F2026%2FSep%2FSep%2026%202026.md)');
+  });
+
+  it('schedules task update when remote description differs from local child notes', () => {
+    const local = [
+      task({
+        rawText: '- [ ] Task <!-- {"uuid":"111","todoistId":"tod_1"} -->',
+        description: 'Task',
+        childNotes: '- New context note',
+      }),
+    ];
+    const remote: TodoistTask[] = [
+      {
+        id: 'tod_1',
+        project_id: 'proj_1',
+        content: 'Task',
+        is_completed: false,
+        priority: 4,
+        description: '🔗 [Open in Obsidian](obsidian://open?vault=2nd%20Brain&file=Jots%2F2026%2FSep%2FSep%2026%202026.md)',
+      },
+    ];
+
+    const plan = planTodoistReconciliation(local, remote, 'Inbox', '2nd Brain');
+    expect(plan.update).toHaveLength(1);
+    expect(plan.update[0].todoistId).toBe('tod_1');
+  });
+
+  it('orders parent tasks before child subtasks in create plan', () => {
+    const parent = task({
+      id: 'Note.md:1',
+      lineNumber: 1,
+      rawText: '- [ ] Parent Task',
+      description: 'Parent Task',
+    });
+    const child = task({
+      id: 'Note.md:2',
+      lineNumber: 2,
+      rawText: '    - [ ] Child Subtask',
+      description: 'Child Subtask',
+      parentTaskId: 'Note.md:1',
+      parentLineNumber: 1,
+    });
+
+    // Pass child first in array to test sorting
+    const plan = planTodoistReconciliation([child, parent], [], 'Inbox', '2nd Brain');
+    expect(plan.create).toHaveLength(2);
+    expect(plan.create[0].task.id).toBe(parent.id);
+    expect(plan.create[1].task.id).toBe(child.id);
+  });
+});
+

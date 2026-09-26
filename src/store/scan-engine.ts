@@ -1,7 +1,7 @@
 import { App, TFile, debounce, Platform } from 'obsidian';
 import { yieldCooperative } from '../utils/yield';
 import { TaskItem, PluginSettings } from '../types';
-import { parseTaskLine } from '../parser';
+import { parseTaskLine, parseFileTasks } from '../parser';
 import { TaskStore } from './task-store';
 import { RoleResolver } from './role-resolver';
 
@@ -58,32 +58,24 @@ export class ScanEngine {
               try {
                 const content = await this.app.vault.cachedRead(file);
                 const lines = content.split('\n');
+                const fileTasks = parseFileTasks(lines, file.path);
+                const taskById = new Map<string, TaskItem>();
 
-                if (cache?.listItems) {
-                  for (const item of cache.listItems) {
-                    if (item.task !== undefined) {
-                      const lineIdx = item.position.start.line;
-                      if (lineIdx < lines.length) {
-                        const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-                        if (task) {
-                          const res = this.roleResolver.resolveTaskRole(task);
-                          task.effectiveRole = res.role;
-                          task.roleSource = res.source;
-                          allTasks.push(task);
-                        }
-                      }
+                for (const task of fileTasks) {
+                  const res = this.roleResolver.resolveTaskRole(task);
+                  task.effectiveRole = res.role;
+                  task.roleSource = res.source;
+
+                  if (task.parentTaskId && task.effectiveRole === 'untagged') {
+                    const parent = taskById.get(task.parentTaskId);
+                    if (parent && parent.effectiveRole !== 'untagged') {
+                      task.effectiveRole = parent.effectiveRole;
+                      task.roleSource = parent.roleSource;
                     }
                   }
-                } else {
-                  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-                    const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-                    if (task) {
-                      const res = this.roleResolver.resolveTaskRole(task);
-                      task.effectiveRole = res.role;
-                      task.roleSource = res.source;
-                      allTasks.push(task);
-                    }
-                  }
+
+                  taskById.set(task.id, task);
+                  allTasks.push(task);
                 }
               } catch (err) {
                 console.error(`Error reading ${file.path} in GTD Matrix Tasks:`, err);
@@ -123,32 +115,24 @@ export class ScanEngine {
       try {
         const content = await this.app.vault.cachedRead(file);
         const lines = content.split('\n');
+        const tasks = parseFileTasks(lines, file.path);
+        const taskById = new Map<string, TaskItem>();
 
-        if (cache?.listItems) {
-          for (const item of cache.listItems) {
-            if (item.task !== undefined) {
-              const lineIdx = item.position.start.line;
-              if (lineIdx < lines.length) {
-                const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-                if (task) {
-                  const res = this.roleResolver.resolveTaskRole(task);
-                  task.effectiveRole = res.role;
-                  task.roleSource = res.source;
-                  fileTasks.push(task);
-                }
-              }
+        for (const task of tasks) {
+          const res = this.roleResolver.resolveTaskRole(task);
+          task.effectiveRole = res.role;
+          task.roleSource = res.source;
+
+          if (task.parentTaskId && task.effectiveRole === 'untagged') {
+            const parent = taskById.get(task.parentTaskId);
+            if (parent && parent.effectiveRole !== 'untagged') {
+              task.effectiveRole = parent.effectiveRole;
+              task.roleSource = parent.roleSource;
             }
           }
-        } else {
-          for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-            const task = parseTaskLine(lines[lineIdx], file.path, lineIdx);
-            if (task) {
-              const res = this.roleResolver.resolveTaskRole(task);
-              task.effectiveRole = res.role;
-              task.roleSource = res.source;
-              fileTasks.push(task);
-            }
-          }
+
+          taskById.set(task.id, task);
+          fileTasks.push(task);
         }
       } catch (err) {
         console.error(`Error reindexing ${file.path} in GTD Matrix Tasks:`, err);

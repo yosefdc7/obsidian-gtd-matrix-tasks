@@ -76,6 +76,47 @@ export function ensureTodoistIdentity(
   return `${line.trimEnd()} <!-- ${JSON.stringify({ uuid: defaultUuid, todoistId })} -->`;
 }
 
+export function cleanTodoistDescription(rawText: string, maxLines = 50, maxChars = 2000): string {
+  const lines = rawText.split('\n');
+  const keptLines: string[] = [];
+  let isTruncated = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (keptLines.length >= maxLines) {
+      isTruncated = true;
+      break;
+    }
+    const cleaned = lines[i]
+      .replace(HIDDEN_COMMENT_RE, '')
+      .replace(WIKILINK_RE, (_match, target: string, alias?: string) => alias || target.split('/').pop() || target)
+      .trimEnd();
+    keptLines.push(cleaned);
+  }
+
+  let result = keptLines.join('\n').trim();
+  if (result.length > maxChars) {
+    result = result.slice(0, maxChars).trim() + '\n... (truncated)';
+  } else if (isTruncated) {
+    result += '\n... (truncated)';
+  }
+
+  return result;
+}
+
+export function buildTodoistTaskDescription(task: TaskItem, vaultName: string): string {
+  const deepLink = `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(task.filePath)}`;
+  const linkFooter = `🔗 [Open in Obsidian](${deepLink})`;
+
+  if (task.childNotes && task.childNotes.trim().length > 0) {
+    const cleaned = cleanTodoistDescription(task.childNotes);
+    if (cleaned.length > 0) {
+      return `${cleaned}\n\n---\n${linkFooter}`;
+    }
+  }
+
+  return linkFooter;
+}
+
 export function resolveTodoistDueDate(task: TaskItem): string | undefined {
   // Option A: Start date (🛫) takes precedence so tasks alert when work begins.
   // Fallback order: startDate ?? scheduledDate ?? dueDate
@@ -85,11 +126,13 @@ export function resolveTodoistDueDate(task: TaskItem): string | undefined {
 export function planTodoistReconciliation(
   localTasks: TaskItem[],
   remoteTasks: TodoistTask[],
-  defaultProject = 'Inbox'
+  defaultProject = 'Inbox',
+  vaultName = ''
 ): TodoistReconciliationPlan {
   const plan: TodoistReconciliationPlan = {
     create: [],
     update: [],
+    move: [],
     closeTodoistIds: [],
     completeLocalTasks: [],
   };
@@ -97,6 +140,11 @@ export function planTodoistReconciliation(
   const remoteTaskMap = new Map<string, TodoistTask>();
   for (const r of remoteTasks) {
     remoteTaskMap.set(r.id, r);
+  }
+
+  const localTaskById = new Map<string, TaskItem>();
+  for (const t of localTasks) {
+    localTaskById.set(t.id, t);
   }
 
   for (const task of localTasks) {
@@ -112,22 +160,43 @@ export function planTodoistReconciliation(
           // Remote task was completed in Todoist; complete in Obsidian
           plan.completeLocalTasks.push({ task });
         } else if (!task.isCompleted && !remote.is_completed) {
-          // Compare content, due date, priority
+          // Compare content, due date, priority, description
           const expectedTitle = cleanTodoistTaskTitle(task.description);
           const expectedPrio = mapTaskPriorityToTodoist(task.priority);
           const expectedDueDate = resolveTodoistDueDate(task);
+          const expectedDesc = vaultName ? buildTodoistTaskDescription(task, vaultName) : undefined;
           const remoteDueDate = remote.due?.date;
+          const remoteDesc = remote.description ?? '';
 
-          if (
+          let needsUpdate =
             remote.content !== expectedTitle ||
             remote.priority !== expectedPrio ||
-            remoteDueDate !== expectedDueDate
-          ) {
+            remoteDueDate !== expectedDueDate;
+
+          if (expectedDesc !== undefined && remoteDesc !== expectedDesc) {
+            needsUpdate = true;
+          }
+
+          if (needsUpdate) {
             plan.update.push({
               todoistId,
               task,
               projectName: resolveFacetProjectName(task, defaultProject),
             });
+          }
+
+          // Check if parent_id needs moving in Todoist
+          if (task.parentTaskId) {
+            const parent = localTaskById.get(task.parentTaskId);
+            if (parent) {
+              const parentTodoistId = extractTodoistId(parent.rawText);
+              if (parentTodoistId && remote.parent_id !== parentTodoistId) {
+                plan.move?.push({
+                  todoistId,
+                  parentId: parentTodoistId,
+                });
+              }
+            }
           }
         }
       }
@@ -138,6 +207,14 @@ export function planTodoistReconciliation(
       });
     }
   }
+
+  // Ensure root parent tasks come before child subtasks in create plan
+  plan.create.sort((a, b) => {
+    const aHasParent = a.task.parentTaskId ? 1 : 0;
+    const bHasParent = b.task.parentTaskId ? 1 : 0;
+    if (aHasParent !== bHasParent) return aHasParent - bHasParent;
+    return a.task.lineNumber - b.task.lineNumber;
+  });
 
   return plan;
 }

@@ -175,4 +175,67 @@ describe('Section Routing', () => {
       expect(getEisenhowerSection({ ...baseTask, priority: 'none' }, today)).toBe('eisen-inbox');
     });
   });
+
+  describe('File Task Hierarchy & Child Notes Parser', () => {
+    it('parses child notes indented under parent task', () => {
+      const { parseFileTasks } = require('../src/parser');
+      const lines = [
+        '- [ ] Call Diana 📅 2026-09-26',
+        '    - Ask about baby formula',
+        '    - Check delivery status of crib',
+        '- [ ] Another task'
+      ];
+      const tasks = parseFileTasks(lines, 'Jots/2026/Sep/Sep 26 2026.md');
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].description).toBe('Call Diana');
+      expect(tasks[0].childNotes).toBe('- Ask about baby formula\n- Check delivery status of crib');
+      expect(tasks[1].description).toBe('Another task');
+      expect(tasks[1].childNotes).toBeUndefined();
+    });
+
+    it('identifies child checkboxes as subtasks with parentTaskId and parentLineNumber', () => {
+      const { parseFileTasks } = require('../src/parser');
+      const lines = [
+        '- [ ] Parent Project Plan',
+        '    - Context note',
+        '    - [ ] Export architecture diagrams',
+        '    - [ ] Review with team',
+        '- [ ] Sibling task'
+      ];
+      const tasks = parseFileTasks(lines, 'Project.md');
+      expect(tasks).toHaveLength(4);
+
+      const parent = tasks[0];
+      const child1 = tasks[1];
+      const child2 = tasks[2];
+      const sibling = tasks[3];
+
+      expect(parent.description).toBe('Parent Project Plan');
+      expect(parent.childNotes).toBe('- Context note');
+      expect(parent.parentTaskId).toBeUndefined();
+
+      expect(child1.description).toBe('Export architecture diagrams');
+      expect(child1.parentTaskId).toBe('Project.md:0');
+      expect(child1.parentLineNumber).toBe(0);
+
+      expect(child2.description).toBe('Review with team');
+      expect(child2.parentTaskId).toBe('Project.md:0');
+      expect(child2.parentLineNumber).toBe(0);
+
+      expect(sibling.description).toBe('Sibling task');
+      expect(sibling.parentTaskId).toBeUndefined();
+    });
+
+    it('resets outline stack on markdown headings', () => {
+      const { parseFileTasks } = require('../src/parser');
+      const lines = [
+        '- [ ] Task above heading',
+        '## Next Section',
+        '    - [ ] Task below heading'
+      ];
+      const tasks = parseFileTasks(lines, 'Test.md');
+      expect(tasks).toHaveLength(2);
+      expect(tasks[1].parentTaskId).toBeUndefined();
+    });
+  });
 });
