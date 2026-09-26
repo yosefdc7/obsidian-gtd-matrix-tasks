@@ -5,8 +5,10 @@ import {
   cleanTodoistTaskTitle,
   ensureTodoistIdentity,
   extractTodoistId,
+  extractTodoistLabels,
   isTodoistEligible,
   mapTaskPriorityToTodoist,
+  mergeTodoistLabelsToLocalLine,
   planTodoistReconciliation,
   resolveFacetProjectName,
 } from '../src/todoist/todoist-sync-core';
@@ -274,4 +276,166 @@ describe('Todoist Task Description & Child Notes', () => {
     expect(plan.create[1].task.id).toBe(child.id);
   });
 });
+
+describe('Todoist Label Extraction & Tag Filtering', () => {
+  it('extracts normal tags and lowercases them', () => {
+    const t = task({ tags: ['#wealth', '#Someday', '#dckids'] });
+    expect(extractTodoistLabels(t)).toEqual(['dckids', 'someday', 'wealth']);
+  });
+
+  it('converts slashes in nested tags to hyphens', () => {
+    const t = task({ tags: ['#finance/crypto', '#health/fitness/mobility'] });
+    expect(extractTodoistLabels(t)).toEqual(['finance-crypto', 'health-fitness-mobility']);
+  });
+
+  it('filters out internal #role/ and #eisen/ tags', () => {
+    const t = task({
+      tags: [
+        '#role/yo-manager',
+        '#role/josef-selfcare',
+        '#role/rj-supportive',
+        '#eisen/urgent-important',
+        '#eisen/important-not-urgent',
+        '#wealth',
+      ],
+    });
+    expect(extractTodoistLabels(t)).toEqual(['wealth']);
+  });
+
+  it('handles empty or missing tags gracefully', () => {
+    const t = task({ tags: [] });
+    expect(extractTodoistLabels(t)).toEqual([]);
+  });
+});
+
+describe('Todoist Title Cleaning with Tag Stripping', () => {
+  it('strips #tags from title so prose is clean', () => {
+    const raw = 'Setup wealth management portfolio #wealth #finance/crypto 📅 2026-09-30 🔺 <!-- {"uuid":"111"} -->';
+    expect(cleanTodoistTaskTitle(raw)).toBe('Setup wealth management portfolio');
+  });
+
+  it('strips tags while preserving wikilink aliases and Markdown links', () => {
+    const raw = 'Review [[Executive Dashboard|Exec Dash]] and [specs](https://example.com) #delivery #prio1';
+    expect(cleanTodoistTaskTitle(raw)).toBe('Review Exec Dash and specs');
+  });
+});
+
+describe('Local Line Label Merging (Todoist -> Obsidian)', () => {
+  it('appends new label before trailing JSON comment', () => {
+    const line = '- [ ] Buy groceries 📅 2026-09-27 <!-- {"uuid":"111","todoistId":"222"} -->';
+    const merged = mergeTodoistLabelsToLocalLine(line, ['errands']);
+    expect(merged).toBe('- [ ] Buy groceries 📅 2026-09-27 #errands <!-- {"uuid":"111","todoistId":"222"} -->');
+  });
+
+  it('appends multiple new labels', () => {
+    const line = '- [ ] Buy groceries 📅 2026-09-27 <!-- {"uuid":"111"} -->';
+    const merged = mergeTodoistLabelsToLocalLine(line, ['errands', 'urgent']);
+    expect(merged).toBe('- [ ] Buy groceries 📅 2026-09-27 #errands #urgent <!-- {"uuid":"111"} -->');
+  });
+
+  it('avoids duplicating existing tags', () => {
+    const line = '- [ ] Buy groceries #errands 📅 2026-09-27 <!-- {"uuid":"111"} -->';
+    const merged = mergeTodoistLabelsToLocalLine(line, ['errands']);
+    expect(merged).toBe(line);
+  });
+
+  it('handles line without trailing comment', () => {
+    const line = '- [ ] Buy groceries 📅 2026-09-27';
+    const merged = mergeTodoistLabelsToLocalLine(line, ['errands']);
+    expect(merged).toBe('- [ ] Buy groceries 📅 2026-09-27 #errands');
+  });
+
+  it('preserves Windows CRLF carriage returns', () => {
+    const line = '- [ ] Buy groceries 📅 2026-09-27 <!-- {"uuid":"111"} -->\r';
+    const merged = mergeTodoistLabelsToLocalLine(line, ['errands']);
+    expect(merged).toBe('- [ ] Buy groceries 📅 2026-09-27 #errands <!-- {"uuid":"111"} -->\r');
+  });
+});
+
+describe('Todoist Reconciliation Label Synchronization', () => {
+  it('schedules remote update when local task has tags missing in Todoist', () => {
+    const local = [
+      task({
+        rawText: '- [ ] Setup crypto #finance/crypto <!-- {"uuid":"111","todoistId":"tod_1"} -->',
+        description: 'Setup crypto #finance/crypto',
+        tags: ['#finance/crypto'],
+        dueDate: null,
+      }),
+    ];
+    // Remote task does not have the label yet
+    const remote: TodoistTask[] = [
+      {
+        id: 'tod_1',
+        project_id: 'proj_1',
+        content: 'Setup crypto',
+        is_completed: false,
+        priority: 4,
+        due: null,
+        labels: [],
+      },
+    ];
+
+    const plan = planTodoistReconciliation(local, remote);
+    expect(plan.update).toHaveLength(1);
+    expect(plan.update[0].todoistId).toBe('tod_1');
+    expect(plan.updateLocalLabels).toHaveLength(0);
+  });
+
+  it('schedules local label merge when remote task has labels missing locally', () => {
+    const local = [
+      task({
+        rawText: '- [ ] Buy groceries <!-- {"uuid":"111","todoistId":"tod_2"} -->',
+        description: 'Buy groceries',
+        tags: [],
+        dueDate: null,
+      }),
+    ];
+    // Remote task in Todoist has @errands label added by user
+    const remote: TodoistTask[] = [
+      {
+        id: 'tod_2',
+        project_id: 'proj_1',
+        content: 'Buy groceries',
+        is_completed: false,
+        priority: 4,
+        due: null,
+        labels: ['errands'],
+      },
+    ];
+
+    const plan = planTodoistReconciliation(local, remote);
+    expect(plan.updateLocalLabels).toHaveLength(1);
+    expect(plan.updateLocalLabels![0].task.id).toBe(local[0].id);
+    expect(plan.updateLocalLabels![0].labelsToAdd).toEqual(['errands']);
+    // No remote update needed because Todoist already has @errands
+    expect(plan.update).toHaveLength(0);
+  });
+
+  it('no update when local tags and remote labels match', () => {
+    const local = [
+      task({
+        rawText: '- [ ] Setup crypto #finance/crypto <!-- {"uuid":"111","todoistId":"tod_3"} -->',
+        description: 'Setup crypto #finance/crypto',
+        tags: ['#finance/crypto'],
+        dueDate: null,
+      }),
+    ];
+    const remote: TodoistTask[] = [
+      {
+        id: 'tod_3',
+        project_id: 'proj_1',
+        content: 'Setup crypto',
+        is_completed: false,
+        priority: 4,
+        due: null,
+        labels: ['finance-crypto'],
+      },
+    ];
+
+    const plan = planTodoistReconciliation(local, remote);
+    expect(plan.update).toHaveLength(0);
+    expect(plan.updateLocalLabels).toHaveLength(0);
+  });
+});
+
 

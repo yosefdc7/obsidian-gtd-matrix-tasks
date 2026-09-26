@@ -6,10 +6,11 @@ const TODOIST_LEGACY_RE = /<!--\s*todoist-id:\s*([^\s>]+)\s*-->/;
 const JSON_COMMENT_RE = /<!--\s*(\{.*?\})\s*-->/;
 
 const HIDDEN_COMMENT_RE = /<!--.*?-->/g;
-const WIKILINK_RE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+const WIKILINK_RE = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g;
 const MD_LINK_RE = /\[([^\]]+)\]\([^)]+\)/g;
 const DATE_EMOJI_RE = /[\u{1F4C5}\u{1F6EB}\u23F3\u2705]\s*\d{4}-\d{2}-\d{2}(?:[T ]\d{1,2}:\d{2})?/gu;
 const PRIO_EMOJI_RE = /[\u{1F53A}\u23EB\u{1F53C}\u{1F53D}]/gu;
+const TAG_RE = /#[a-zA-Z0-9_/-]+/g;
 
 export function isTodoistEligible(task: TaskItem): boolean {
   return !task.isCompleted && task.statusChar === ' ';
@@ -45,6 +46,7 @@ export function cleanTodoistTaskTitle(rawDescription: string): string {
     .replace(PRIO_EMOJI_RE, '')
     .replace(WIKILINK_RE, (_match, target: string, alias?: string) => alias || target.split('/').pop() || target)
     .replace(MD_LINK_RE, '$1')
+    .replace(TAG_RE, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -74,6 +76,82 @@ export function ensureTodoistIdentity(
   }
 
   return `${line.trimEnd()} <!-- ${JSON.stringify({ uuid: defaultUuid, todoistId })} -->`;
+}
+
+export function extractTodoistLabels(task: TaskItem): string[] {
+  const tags = task.tags ?? [];
+  const labels: string[] = [];
+
+  for (const tag of tags) {
+    const clean = tag.replace(/^#+/, '').trim();
+    if (!clean) continue;
+
+    const lower = clean.toLowerCase();
+    // Exclude internal routing tags (roles and Eisenhower matrix tags)
+    if (
+      lower.startsWith('role/') ||
+      lower.startsWith('eisen/') ||
+      lower === 'role' ||
+      lower === 'eisen'
+    ) {
+      continue;
+    }
+
+    // Convert slashes to hyphens because Todoist label names cannot contain slashes
+    const labelName = lower.replace(/\//g, '-').replace(/[\s@]/g, '-');
+    if (labelName && !labels.includes(labelName)) {
+      labels.push(labelName);
+    }
+  }
+
+  return labels.sort();
+}
+
+export function mergeTodoistLabelsToLocalLine(line: string, remoteLabels: string[]): string {
+  if (!remoteLabels || remoteLabels.length === 0) return line;
+
+  const hasCr = line.endsWith('\r');
+  const cleanLine = line.replace(/\r$/, '');
+
+  // Extract existing tags from line to avoid duplicates
+  const existingTags = (cleanLine.match(TAG_RE) ?? []).map((t) =>
+    t.replace(/^#+/, '').replace(/\//g, '-').toLowerCase()
+  );
+
+  const newTagsToAppend: string[] = [];
+  for (const label of remoteLabels) {
+    const norm = label.replace(/^#+/, '').replace(/[\s/]/g, '-').toLowerCase().trim();
+    if (!norm) continue;
+    if (
+      norm.startsWith('role/') ||
+      norm.startsWith('eisen/') ||
+      norm === 'role' ||
+      norm === 'eisen'
+    ) {
+      continue;
+    }
+    if (!existingTags.includes(norm)) {
+      newTagsToAppend.push(`#${norm}`);
+      existingTags.push(norm);
+    }
+  }
+
+  if (newTagsToAppend.length === 0) return line;
+
+  const tagString = newTagsToAppend.join(' ');
+
+  // Insert before trailing comment if present
+  const commentMatch = cleanLine.match(/\s*(<!--.*?-->)\s*$/);
+  let updatedLine: string;
+  if (commentMatch && commentMatch.index !== undefined) {
+    const beforeComment = cleanLine.slice(0, commentMatch.index).trimEnd();
+    const comment = commentMatch[1];
+    updatedLine = `${beforeComment} ${tagString} ${comment}`;
+  } else {
+    updatedLine = `${cleanLine.trimEnd()} ${tagString}`;
+  }
+
+  return hasCr ? `${updatedLine}\r` : updatedLine;
 }
 
 export function cleanTodoistDescription(rawText: string, maxLines = 50, maxChars = 2000): string {
@@ -135,6 +213,7 @@ export function planTodoistReconciliation(
     move: [],
     closeTodoistIds: [],
     completeLocalTasks: [],
+    updateLocalLabels: [],
   };
 
   const remoteTaskMap = new Map<string, TodoistTask>();
@@ -160,18 +239,33 @@ export function planTodoistReconciliation(
           // Remote task was completed in Todoist; complete in Obsidian
           plan.completeLocalTasks.push({ task });
         } else if (!task.isCompleted && !remote.is_completed) {
-          // Compare content, due date, priority, description
+          // Compare content, due date, priority, description, labels
           const expectedTitle = cleanTodoistTaskTitle(task.description);
           const expectedPrio = mapTaskPriorityToTodoist(task.priority);
           const expectedDueDate = resolveTodoistDueDate(task);
           const expectedDesc = vaultName ? buildTodoistTaskDescription(task, vaultName) : undefined;
+          const expectedLabels = extractTodoistLabels(task);
           const remoteDueDate = remote.due?.date;
           const remoteDesc = remote.description ?? '';
+          const remoteLabels = (remote.labels ?? []).map((l) => l.toLowerCase().replace(/\//g, '-')).sort();
+
+          // Check for labels added in Todoist that are missing locally
+          const labelsToAddLocally = remoteLabels.filter((rl) => !expectedLabels.includes(rl));
+          if (labelsToAddLocally.length > 0) {
+            plan.updateLocalLabels?.push({
+              task,
+              labelsToAdd: labelsToAddLocally,
+            });
+          }
+
+          // Check if remote is missing any labels present locally
+          const labelsMissingInRemote = expectedLabels.filter((el) => !remoteLabels.includes(el));
 
           let needsUpdate =
             remote.content !== expectedTitle ||
             remote.priority !== expectedPrio ||
-            remoteDueDate !== expectedDueDate;
+            remoteDueDate !== expectedDueDate ||
+            labelsMissingInRemote.length > 0;
 
           if (expectedDesc !== undefined && remoteDesc !== expectedDesc) {
             needsUpdate = true;

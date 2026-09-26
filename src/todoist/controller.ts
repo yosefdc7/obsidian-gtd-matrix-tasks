@@ -9,8 +9,10 @@ import {
   cleanTodoistTaskTitle,
   ensureTodoistIdentity,
   extractTodoistId,
+  extractTodoistLabels,
   isTodoistEligible,
   mapTaskPriorityToTodoist,
+  mergeTodoistLabelsToLocalLine,
   planTodoistReconciliation,
   resolveFacetProjectName,
   resolveTodoistDueDate,
@@ -51,7 +53,7 @@ export class TodoistSyncController {
     return { ...this.status };
   }
 
-  schedule(delayMs = 15_000): void {
+  schedule(delayMs = 5_000): void {
     if (!this.getSettings().todoistSyncEnabled) return;
     if (this.running) return;
 
@@ -127,6 +129,10 @@ export class TodoistSyncController {
 
       // 2. Fetch remote tasks
       const remoteTasks = await client.getTasks();
+      const remoteTaskMap = new Map<string, TodoistTask>();
+      for (const r of remoteTasks) {
+        remoteTaskMap.set(r.id, r);
+      }
 
       // 3. Fetch local tasks
       const localTasks = this.scanner.getTasks();
@@ -144,6 +150,7 @@ export class TodoistSyncController {
       let updatedCount = 0;
       let closedCount = 0;
       let localCompletedCount = 0;
+      let localLabelsUpdatedCount = 0;
 
       // 5. Apply plan: Complete local tasks checked off in Todoist
       for (const { task } of plan.completeLocalTasks) {
@@ -157,6 +164,22 @@ export class TodoistSyncController {
           (line) => setTaskCompletion(line, true)
         );
         if (success) localCompletedCount++;
+      }
+
+      // 5b. Apply plan: Merge new labels from Todoist to local tasks
+      if (plan.updateLocalLabels) {
+        for (const { task, labelsToAdd } of plan.updateLocalLabels) {
+          const targetFile = this.app.vault.getAbstractFileByPath(task.filePath);
+          if (!(targetFile instanceof TFile)) continue;
+
+          const success = await this.scanner.updateTaskLine(
+            task.filePath,
+            task.lineNumber,
+            task.rawText,
+            (line) => mergeTodoistLabelsToLocalLine(line, labelsToAdd)
+          );
+          if (success) localLabelsUpdatedCount++;
+        }
       }
 
       // 6. Apply plan: Close remote tasks checked off in Obsidian
@@ -179,6 +202,7 @@ export class TodoistSyncController {
 
         const priority = mapTaskPriorityToTodoist(task.priority);
         const description = buildTodoistTaskDescription(task, vaultName);
+        const labels = extractTodoistLabels(task);
 
         // Resolve parent_id if this is an indented child subtask
         let parentTodoistId: string | undefined = undefined;
@@ -201,6 +225,7 @@ export class TodoistSyncController {
           priority,
           description,
           parent_id: parentTodoistId,
+          labels: labels.length > 0 ? labels : undefined,
         });
 
         createdIdMap.set(task.id, created.id);
@@ -221,6 +246,11 @@ export class TodoistSyncController {
         const title = cleanTodoistTaskTitle(task.description);
         const priority = mapTaskPriorityToTodoist(task.priority);
         const description = buildTodoistTaskDescription(task, vaultName);
+        const labels = extractTodoistLabels(task);
+        // Include any remote labels so Todoist additions aren't wiped
+        const remoteTask = remoteTaskMap.get(todoistId);
+        const remoteLabels = (remoteTask?.labels ?? []).map((l) => l.toLowerCase().replace(/\//g, '-'));
+        const combinedLabels = Array.from(new Set([...labels, ...remoteLabels])).sort();
 
         await client.updateTask(todoistId, {
           content: title,
@@ -228,6 +258,7 @@ export class TodoistSyncController {
           due_date: resolveTodoistDueDate(task),
           priority,
           description,
+          labels: combinedLabels,
         });
         updatedCount++;
       }
@@ -251,9 +282,16 @@ export class TodoistSyncController {
       };
 
       if (showNotice) {
-        new Notice(
-          `Todoist synced: ${createdCount} created, ${updatedCount} updated, ${closedCount} closed, ${localCompletedCount} completed locally.`
-        );
+        const parts = [
+          `${createdCount} created`,
+          `${updatedCount} updated`,
+          `${closedCount} closed`,
+          `${localCompletedCount} completed locally`,
+        ];
+        if (localLabelsUpdatedCount > 0) {
+          parts.push(`${localLabelsUpdatedCount} tags updated locally`);
+        }
+        new Notice(`Todoist synced: ${parts.join(', ')}.`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

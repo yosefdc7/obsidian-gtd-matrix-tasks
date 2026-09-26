@@ -38,6 +38,7 @@ export interface TodoistReconciliationPlan {
   move?: Array<{ todoistId: string; parentId: string }>;
   closeTodoistIds: string[];
   completeLocalTasks: Array<{ task: TaskItem }>;
+  updateLocalLabels?: Array<{ task: TaskItem; labelsToAdd: string[] }>;
 }
 
 export interface CreateTodoistTaskParams {
@@ -56,4 +57,5 @@ export interface UpdateTodoistTaskParams {
   due_date?: string;
   priority?: number;
   description?: string;
+  labels?: string[];
 }
