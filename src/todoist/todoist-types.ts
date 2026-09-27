@@ -57,6 +57,7 @@ export interface UpdateTodoistTaskParams {
   content?: string;
   project_id?: string;
   due_date?: string;
+  due_string?: string;
   priority?: number;
   description?: string;
   labels?: string[];

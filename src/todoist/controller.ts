@@ -292,14 +292,33 @@ export class TodoistSyncController {
 
         const remoteUpdatedAtMs = remoteTask?.updated_at ? new Date(remoteTask.updated_at).getTime() : 0;
         const localMtimeMs = fileMtimeMap.get(task.filePath) ?? 0;
-        const effectiveDueDate = (remoteUpdatedAtMs > localMtimeMs && remoteTask?.due?.date)
-          ? remoteTask.due.date
-          : resolveTodoistDueDate(task);
+
+        let targetDueDate: string | undefined = undefined;
+        let targetDueString: string | undefined = undefined;
+
+        if (remoteUpdatedAtMs > localMtimeMs) {
+          // Remote Todoist is newer: adopt remote due date state
+          if (remoteTask?.due?.date) {
+            targetDueDate = remoteTask.due.date;
+          } else {
+            targetDueString = 'no date';
+          }
+        } else {
+          // Local Obsidian note is newer: push local due date state
+          const localDueDate = resolveTodoistDueDate(task);
+          if (localDueDate) {
+            targetDueDate = localDueDate;
+          } else if (remoteTask?.due?.date) {
+            // Local date was removed, so clear remote due date in Todoist
+            targetDueString = 'no date';
+          }
+        }
 
         await client.updateTask(todoistId, {
           content: title,
           project_id: targetProjectId,
-          due_date: effectiveDueDate,
+          due_date: targetDueDate,
+          due_string: targetDueString,
           priority,
           description,
           labels: combinedLabels,
