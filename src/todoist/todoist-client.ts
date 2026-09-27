@@ -73,6 +73,7 @@ export class TodoistClient {
       priority: typeof t.priority === 'number' ? t.priority : 1,
       parent_id: t.parent_id ? String(t.parent_id) : null,
       labels: Array.isArray(t.labels) ? (t.labels as string[]) : [],
+      updated_at: typeof t.updated_at === 'string' ? t.updated_at : undefined,
     }));
   }
 

@@ -23,6 +23,7 @@ export interface TodoistTask {
   priority: number;
   parent_id?: string | null;
   labels?: string[];
+  updated_at?: string;
 }
 
 export interface TodoistSyncStatus {
@@ -39,6 +40,7 @@ export interface TodoistReconciliationPlan {
   closeTodoistIds: string[];
   completeLocalTasks: Array<{ task: TaskItem }>;
   updateLocalLabels?: Array<{ task: TaskItem; labelsToAdd: string[] }>;
+  updateLocalDueDates?: Array<{ task: TaskItem; newDueDate: string | null }>;
 }
 
 export interface CreateTodoistTaskParams {

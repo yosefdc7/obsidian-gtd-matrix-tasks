@@ -201,11 +201,43 @@ export function resolveTodoistDueDate(task: TaskItem): string | undefined {
   return (task.startDate ?? task.scheduledDate ?? task.dueDate) ?? undefined;
 }
 
+const TASK_DATE_RE = /[\u{1F4C5}\u{1F6EB}\u23F3]\s*\d{4}-\d{2}-\d{2}(?:[T ]\d{1,2}:\d{2})?/gu;
+
+export function updateTaskLineDueDate(line: string, newDueDate: string | null): string {
+  const hasCr = line.endsWith('\r');
+  let cleanLine = line.replace(/\r$/, '').replace(TASK_DATE_RE, '');
+  cleanLine = cleanLine.replace(/[ \t]{2,}/g, ' ');
+
+  const commentMatch = cleanLine.match(/\s*(<!--.*?-->)\s*$/);
+  let updatedLine: string;
+
+  if (newDueDate) {
+    if (commentMatch && commentMatch.index !== undefined) {
+      const beforeComment = cleanLine.slice(0, commentMatch.index).trimEnd();
+      const comment = commentMatch[1];
+      updatedLine = `${beforeComment} 📅 ${newDueDate} ${comment}`;
+    } else {
+      updatedLine = `${cleanLine.trimEnd()} 📅 ${newDueDate}`;
+    }
+  } else {
+    if (commentMatch && commentMatch.index !== undefined) {
+      const beforeComment = cleanLine.slice(0, commentMatch.index).trimEnd();
+      const comment = commentMatch[1];
+      updatedLine = `${beforeComment} ${comment}`;
+    } else {
+      updatedLine = cleanLine.trimEnd();
+    }
+  }
+
+  return hasCr ? `${updatedLine}\r` : updatedLine;
+}
+
 export function planTodoistReconciliation(
   localTasks: TaskItem[],
   remoteTasks: TodoistTask[],
   defaultProject = 'Inbox',
-  vaultName = ''
+  vaultName = '',
+  fileMtimes?: Map<string, number>
 ): TodoistReconciliationPlan {
   const plan: TodoistReconciliationPlan = {
     create: [],
@@ -214,6 +246,7 @@ export function planTodoistReconciliation(
     closeTodoistIds: [],
     completeLocalTasks: [],
     updateLocalLabels: [],
+    updateLocalDueDates: [],
   };
 
   const remoteTaskMap = new Map<string, TodoistTask>();
@@ -261,10 +294,28 @@ export function planTodoistReconciliation(
           // Check if remote is missing any labels present locally
           const labelsMissingInRemote = expectedLabels.filter((el) => !remoteLabels.includes(el));
 
+          // Check due date differences between local and remote
+          let dueDateNeedsPushToRemote = false;
+          if (remoteDueDate !== expectedDueDate) {
+            const remoteUpdatedAtMs = remote.updated_at ? new Date(remote.updated_at).getTime() : 0;
+            const localMtimeMs = fileMtimes?.get(task.filePath) ?? 0;
+
+            if (remoteUpdatedAtMs > localMtimeMs) {
+              // Remote was updated more recently in Todoist -> pull to Obsidian
+              plan.updateLocalDueDates?.push({
+                task,
+                newDueDate: remoteDueDate ?? null,
+              });
+            } else {
+              // Local file was modified more recently -> push to Todoist
+              dueDateNeedsPushToRemote = true;
+            }
+          }
+
           let needsUpdate =
             remote.content !== expectedTitle ||
             remote.priority !== expectedPrio ||
-            remoteDueDate !== expectedDueDate ||
+            dueDateNeedsPushToRemote ||
             labelsMissingInRemote.length > 0;
 
           if (expectedDesc !== undefined && remoteDesc !== expectedDesc) {

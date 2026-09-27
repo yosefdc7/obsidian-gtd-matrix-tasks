@@ -1,4 +1,3 @@
-
 import type { App, TFile, CachedMetadata } from 'obsidian';
 import { isDateTitledNote } from './date-utils';
 import { PluginSettings } from './types';
@@ -9,7 +8,6 @@ export function normalizePath(path: string): string {
 }
 
 export const EXCLUDED_PREFIXES = [
-  '00 Identity/',
   'System/',
   'References/Templates/',
   'References/System/',
@@ -17,8 +15,36 @@ export const EXCLUDED_PREFIXES = [
   '.obsidian/'
 ];
 
+/**
+ * Root Facet and Identity Anchor files that must never be moved automatically
+ */
+export const PROTECTED_EXACT_FILES = new Set([
+  '00 Identity/Josef Romeo.md',
+  '00 Identity/Yo the Manager/Yo the Manager.md',
+  '00 Identity/Josef with Self Care/Josef with Self Care.md',
+  '00 Identity/RJ the Supportive/RJ the Supportive.md'
+]);
+
+/**
+ * Canonical Area Folder mapping per Knowledge Model v2
+ */
+export const AREA_FOLDER_MAP: Record<string, string> = {
+  'work & leadership': '00 Identity/Yo the Manager/Work & Leadership',
+  'property & business': '00 Identity/Yo the Manager/Property & Business',
+  'agile & delivery': '00 Identity/Yo the Manager/Work & Leadership',
+  'health & fitness': '00 Identity/Josef with Self Care/Health & Fitness',
+  'investing & trading': '00 Identity/Josef with Self Care/Investing & Trading',
+  'trading & finance': '00 Identity/Josef with Self Care/Investing & Trading',
+  'personal systems & pkm': '00 Identity/Josef with Self Care/Personal Systems & PKM',
+  'system & pkm': '00 Identity/Josef with Self Care/Personal Systems & PKM',
+  'life admin': '00 Identity/Josef with Self Care/Life Admin',
+  'admin & life': '00 Identity/Josef with Self Care/Life Admin',
+  'family & relationships': '00 Identity/RJ the Supportive/Family & Relationships',
+  'home & household': '00 Identity/RJ the Supportive/Home & Household'
+};
+
 export const AREA_TAG_MAP: Record<string, string[]> = {
-  '00 Identity/Josef with Self Care/Trading & Finance': [
+  '00 Identity/Josef with Self Care/Investing & Trading': [
     'finance',
     'trading',
     'crypto',
@@ -43,7 +69,7 @@ export const AREA_TAG_MAP: Record<string, string[]> = {
     'skincare',
     'skin'
   ],
-  '00 Identity/Yo the Manager/Agile & Delivery': [
+  '00 Identity/Yo the Manager/Work & Leadership': [
     'agile',
     'scrum',
     'delivery',
@@ -53,16 +79,28 @@ export const AREA_TAG_MAP: Record<string, string[]> = {
     'product',
     'roadmap'
   ],
-  '00 Identity/RJ the Supportive/Admin & Life': [
+  '00 Identity/Josef with Self Care/Life Admin': [
     'admin',
     'tax',
     'taxes',
     'legal',
-    'family',
-    'home',
     'government'
   ],
-  '00 Identity/Josef with Self Care/System & PKM': [
+  '00 Identity/RJ the Supportive/Family & Relationships': [
+    'family',
+    'relationship',
+    'relationships',
+    'parenting',
+    'parents'
+  ],
+  '00 Identity/RJ the Supportive/Home & Household': [
+    'home',
+    'household',
+    'house',
+    'furniture',
+    'maintenance'
+  ],
+  '00 Identity/Josef with Self Care/Personal Systems & PKM': [
     'system',
     'pkm',
     'obsidian',
@@ -71,6 +109,30 @@ export const AREA_TAG_MAP: Record<string, string[]> = {
     'plugin',
     'plugins'
   ]
+};
+
+export const TYPE_RESOURCE_MAP: Record<string, string> = {
+  guide: 'References/Guides',
+  guides: 'References/Guides',
+  playbook: 'References/Playbooks',
+  playbooks: 'References/Playbooks',
+  person: 'References/People',
+  people: 'References/People',
+  'area/people': 'References/People',
+  partner: 'References/Partners',
+  partners: 'References/Partners',
+  company: 'References/Partners',
+  companies: 'References/Partners',
+  source: 'References/Sources',
+  sources: 'References/Sources',
+  book: 'References/Sources',
+  books: 'References/Sources',
+  article: 'References/Sources',
+  articles: 'References/Sources',
+  goal: 'References/Goals',
+  goals: 'References/Goals',
+  topic: 'References/Topics',
+  topics: 'References/Topics'
 };
 
 export const RESOURCE_TAG_MAP: Record<string, string[]> = {
@@ -96,6 +158,65 @@ export const ROLE_PROJECT_MAP: Record<string, string> = {
 
 export function normalizeTag(tag: string): string {
   return tag.trim().replace(/^#/, '').toLowerCase();
+}
+
+export function cleanLinkOrText(val: unknown): string {
+  if (!val) return '';
+  return String(val)
+    .replace(/\[\[|\]\]/g, '')
+    .replace(/\|.*$/, '')
+    .trim();
+}
+
+export function resolveRole(
+  frontmatter?: Record<string, unknown>,
+  tags?: string[]
+): string | null {
+  if (frontmatter) {
+    if (frontmatter.identities) {
+      const identityRole = extractRoleFromIdentities(frontmatter.identities);
+      if (identityRole) return identityRole;
+    }
+    if (typeof frontmatter.role === 'string' && frontmatter.role.trim()) {
+      const clean = cleanLinkOrText(frontmatter.role).toLowerCase();
+      const identityRole = extractRoleFromIdentities([clean]);
+      if (identityRole) return identityRole;
+      if (ROLE_PROJECT_MAP[clean]) return clean;
+      if (ROLE_PROJECT_MAP[`role/${clean}`]) return `role/${clean}`;
+    }
+  }
+
+  if (tags && tags.length > 0) {
+    for (const t of tags) {
+      const norm = normalizeTag(t);
+      if (ROLE_PROJECT_MAP[norm]) return norm;
+      const identityRole = extractRoleFromIdentities([norm]);
+      if (identityRole) return identityRole;
+    }
+  }
+
+  return null;
+}
+
+export function isProtected(normPath: string): boolean {
+  for (const prefix of EXCLUDED_PREFIXES) {
+    if (normPath.startsWith(normalizePath(prefix))) {
+      return true;
+    }
+  }
+  if (PROTECTED_EXACT_FILES.has(normPath)) {
+    return true;
+  }
+  // Protect Area Root index notes (e.g. "00 Identity/Yo the Manager/Work & Leadership/Work & Leadership.md")
+  const parts = normPath.split('/');
+  if (parts.length >= 4 && parts[0] === '00 Identity') {
+    const parentFolder = parts[parts.length - 2];
+    const fileNameWithoutExt = parts[parts.length - 1].replace(/\.md$/, '');
+    if (parentFolder.toLowerCase() === fileNameWithoutExt.toLowerCase()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function resolveCollision(
@@ -133,10 +254,8 @@ export function determineDestinationFolder(
 ): string | null {
   const normPath = normalizePath(filePath);
 
-  for (const prefix of EXCLUDED_PREFIXES) {
-    if (normPath.startsWith(normalizePath(prefix))) {
-      return null;
-    }
+  if (isProtected(normPath)) {
+    return null;
   }
 
   const inJots = normPath.startsWith('Jots/') || normPath === 'Jots';
@@ -147,27 +266,52 @@ export function determineDestinationFolder(
   }
 
   const normalizedTags = tags.map(normalizeTag);
+  const rawType = frontmatter?.type ? String(frontmatter.type).trim().toLowerCase() : '';
 
+  // 1. PROJECT ROUTING (Property-first or tag-first)
   const isProject =
+    rawType === 'project' ||
+    rawType.endsWith('/project') ||
     normalizedTags.includes('project') ||
-    normalizedTags.includes('projects') ||
-    (typeof frontmatter?.type === 'string' && frontmatter.type.toLowerCase() === 'project');
+    normalizedTags.includes('projects');
 
   if (isProject) {
-    if (frontmatter?.identities) {
-      const identityRole = extractRoleFromIdentities(frontmatter.identities);
-      if (identityRole && ROLE_PROJECT_MAP[identityRole]) {
-        return ROLE_PROJECT_MAP[identityRole];
-      }
+    const role = resolveRole(frontmatter, normalizedTags);
+    if (role && ROLE_PROJECT_MAP[role]) {
+      return ROLE_PROJECT_MAP[role];
     }
+    return null;
+  }
 
-    for (const [roleKey, targetFolder] of Object.entries(ROLE_PROJECT_MAP)) {
-      if (normalizedTags.includes(roleKey)) {
+  // 2. AREA ROUTING (Property-first)
+  if (rawType === 'area') {
+    const areaProp = cleanLinkOrText(frontmatter?.area).toLowerCase();
+    if (areaProp && AREA_FOLDER_MAP[areaProp]) {
+      return AREA_FOLDER_MAP[areaProp];
+    }
+    const parentProp = cleanLinkOrText(frontmatter?.parent).toLowerCase();
+    if (parentProp && AREA_FOLDER_MAP[parentProp]) {
+      return AREA_FOLDER_MAP[parentProp];
+    }
+    for (const [targetFolder, matchTags] of Object.entries(AREA_TAG_MAP)) {
+      if (normalizedTags.some((t) => matchTags.includes(t))) {
         return targetFolder;
       }
     }
+    return null;
   }
 
+  // 3. RESOURCE / REFERENCE ROUTING (Property-first)
+  if (rawType && TYPE_RESOURCE_MAP[rawType]) {
+    return TYPE_RESOURCE_MAP[rawType];
+  }
+
+  // If already inside 00 Identity/ and neither project, area, nor explicit reference type, don't move out
+  if (normPath.startsWith('00 Identity/')) {
+    return null;
+  }
+
+  // 4. FALLBACK TO TAGS (Legacy / untyped notes)
   for (const [targetFolder, matchTags] of Object.entries(RESOURCE_TAG_MAP)) {
     if (normalizedTags.some((t) => matchTags.includes(t))) {
       return targetFolder;
@@ -184,6 +328,7 @@ export function determineDestinationFolder(
     return 'References/Topics';
   }
 
+  // 5. JOTS EVICTION (Non-date notes created in Jots default to References/Topics)
   if (inJots && !isDate) {
     return 'References/Topics';
   }
@@ -251,7 +396,10 @@ export class AutoMover {
       }
 
       const currentParent = file.parent ? file.parent.path : '';
-      if (normalizePath(currentParent) === normalizePath(destinationFolder) || normalizePath(file.path) === normalizePath(`${destinationFolder}/${file.name}`)) {
+      if (
+        normalizePath(currentParent) === normalizePath(destinationFolder) ||
+        normalizePath(file.path) === normalizePath(`${destinationFolder}/${file.name}`)
+      ) {
         return false;
       }
 

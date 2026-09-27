@@ -231,7 +231,6 @@ export default class GTDMatrixPlugin extends Plugin {
                 fm.tags.push(tag);
               }
             }
-            delete fm.role;
           }
         });
       }

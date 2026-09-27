@@ -16,6 +16,7 @@ import {
   planTodoistReconciliation,
   resolveFacetProjectName,
   resolveTodoistDueDate,
+  updateTaskLineDueDate,
 } from './todoist-sync-core';
 import { setTaskCompletion } from '../parser';
 
@@ -136,6 +137,15 @@ export class TodoistSyncController {
 
       // 3. Fetch local tasks
       const localTasks = this.scanner.getTasks();
+      const fileMtimeMap = new Map<string, number>();
+      for (const task of localTasks) {
+        if (!fileMtimeMap.has(task.filePath)) {
+          const file = this.app.vault.getAbstractFileByPath(task.filePath);
+          if (file instanceof TFile) {
+            fileMtimeMap.set(task.filePath, file.stat.mtime);
+          }
+        }
+      }
 
       // 4. Calculate reconciliation plan
       const vaultName = this.app.vault.getName();
@@ -143,7 +153,8 @@ export class TodoistSyncController {
         localTasks,
         remoteTasks,
         settings.todoistDefaultProject || 'Inbox',
-        vaultName
+        vaultName,
+        fileMtimeMap
       );
 
       let createdCount = 0;
@@ -151,6 +162,7 @@ export class TodoistSyncController {
       let closedCount = 0;
       let localCompletedCount = 0;
       let localLabelsUpdatedCount = 0;
+      let localDueDatesUpdatedCount = 0;
 
       // 5. Apply plan: Complete local tasks checked off in Todoist
       for (const { task } of plan.completeLocalTasks) {
@@ -179,6 +191,22 @@ export class TodoistSyncController {
             (line) => mergeTodoistLabelsToLocalLine(line, labelsToAdd)
           );
           if (success) localLabelsUpdatedCount++;
+        }
+      }
+
+      // 5c. Apply plan: Merge new due dates from Todoist to local tasks
+      if (plan.updateLocalDueDates) {
+        for (const { task, newDueDate } of plan.updateLocalDueDates) {
+          const targetFile = this.app.vault.getAbstractFileByPath(task.filePath);
+          if (!(targetFile instanceof TFile)) continue;
+
+          const success = await this.scanner.updateTaskLine(
+            task.filePath,
+            task.lineNumber,
+            task.rawText,
+            (line) => updateTaskLineDueDate(line, newDueDate)
+          );
+          if (success) localDueDatesUpdatedCount++;
         }
       }
 
@@ -252,10 +280,16 @@ export class TodoistSyncController {
         const remoteLabels = (remoteTask?.labels ?? []).map((l) => l.toLowerCase().replace(/\//g, '-'));
         const combinedLabels = Array.from(new Set([...labels, ...remoteLabels])).sort();
 
+        const remoteUpdatedAtMs = remoteTask?.updated_at ? new Date(remoteTask.updated_at).getTime() : 0;
+        const localMtimeMs = fileMtimeMap.get(task.filePath) ?? 0;
+        const effectiveDueDate = (remoteUpdatedAtMs > localMtimeMs && remoteTask?.due?.date)
+          ? remoteTask.due.date
+          : resolveTodoistDueDate(task);
+
         await client.updateTask(todoistId, {
           content: title,
           project_id: targetProjectId,
-          due_date: resolveTodoistDueDate(task),
+          due_date: effectiveDueDate,
           priority,
           description,
           labels: combinedLabels,
@@ -290,6 +324,9 @@ export class TodoistSyncController {
         ];
         if (localLabelsUpdatedCount > 0) {
           parts.push(`${localLabelsUpdatedCount} tags updated locally`);
+        }
+        if (localDueDatesUpdatedCount > 0) {
+          parts.push(`${localDueDatesUpdatedCount} due dates updated locally`);
         }
         new Notice(`Todoist synced: ${parts.join(', ')}.`);
       }

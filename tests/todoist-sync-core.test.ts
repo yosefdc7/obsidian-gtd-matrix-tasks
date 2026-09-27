@@ -11,6 +11,7 @@ import {
   mergeTodoistLabelsToLocalLine,
   planTodoistReconciliation,
   resolveFacetProjectName,
+  updateTaskLineDueDate,
 } from '../src/todoist/todoist-sync-core';
 
 const task = (overrides: Partial<TaskItem> = {}): TaskItem => ({
@@ -437,5 +438,156 @@ describe('Todoist Reconciliation Label Synchronization', () => {
     expect(plan.updateLocalLabels).toHaveLength(0);
   });
 });
+
+describe('updateTaskLineDueDate', () => {
+  it('updates existing 📅 due date preserving comment and tags', () => {
+    const line = '- [ ] Fix todo list #management 📅 2026-09-26 🔺 <!-- {"uuid":"111","todoistId":"tod_1"} -->';
+    const updated = updateTaskLineDueDate(line, '2026-10-04');
+    expect(updated).toBe('- [ ] Fix todo list #management 🔺 📅 2026-10-04 <!-- {"uuid":"111","todoistId":"tod_1"} -->');
+  });
+
+  it('replaces 🛫 start date with 📅 due date', () => {
+    const line = '- [ ] Gene solutions 🛫 2026-09-26 <!-- {"uuid":"222"} -->';
+    const updated = updateTaskLineDueDate(line, '2026-10-04');
+    expect(updated).toBe('- [ ] Gene solutions 📅 2026-10-04 <!-- {"uuid":"222"} -->');
+  });
+
+  it('replaces ⏳ scheduled date with 📅 due date', () => {
+    const line = '- [ ] Bed on floor ⏳ 2026-09-25 <!-- {"uuid":"333"} -->';
+    const updated = updateTaskLineDueDate(line, '2026-10-04');
+    expect(updated).toBe('- [ ] Bed on floor 📅 2026-10-04 <!-- {"uuid":"333"} -->');
+  });
+
+  it('removes date when newDueDate is null', () => {
+    const line = '- [ ] Clean garage 📅 2026-09-26 <!-- {"uuid":"444"} -->';
+    const updated = updateTaskLineDueDate(line, null);
+    expect(updated).toBe('- [ ] Clean garage <!-- {"uuid":"444"} -->');
+  });
+
+  it('adds due date when none existed before comment', () => {
+    const line = '- [ ] Simple task <!-- {"uuid":"555"} -->';
+    const updated = updateTaskLineDueDate(line, '2026-10-04');
+    expect(updated).toBe('- [ ] Simple task 📅 2026-10-04 <!-- {"uuid":"555"} -->');
+  });
+
+  it('adds due date to line without comment', () => {
+    const line = '- [ ] Simple task without comment';
+    const updated = updateTaskLineDueDate(line, '2026-10-04');
+    expect(updated).toBe('- [ ] Simple task without comment 📅 2026-10-04');
+  });
+
+  it('preserves Windows CRLF carriage returns', () => {
+    const line = '- [ ] Task with crlf 📅 2026-09-26 <!-- {"uuid":"666"} -->\r';
+    const updated = updateTaskLineDueDate(line, '2026-10-04');
+    expect(updated).toBe('- [ ] Task with crlf 📅 2026-10-04 <!-- {"uuid":"666"} -->\r');
+  });
+});
+
+describe('Todoist Reconciliation Due Date Synchronization', () => {
+  it('schedules local due date update when remote updated_at is newer than local mtime', () => {
+    const local = [
+      task({
+        filePath: 'Jots/2026/Sep/Sep 26 2026.md',
+        rawText: '- [ ] Bed on floor 📅 2026-09-26 <!-- {"uuid":"111","todoistId":"tod_bed"} -->',
+        description: 'Bed on floor 📅 2026-09-26',
+        dueDate: '2026-09-26',
+      }),
+    ];
+
+    const remote: TodoistTask[] = [
+      {
+        id: 'tod_bed',
+        project_id: 'proj_1',
+        content: 'Bed on floor',
+        is_completed: false,
+        priority: 4,
+        due: { date: '2026-10-04' },
+        updated_at: '2026-09-27T08:00:00.000Z',
+      },
+    ];
+
+    const fileMtimes = new Map<string, number>([
+      ['Jots/2026/Sep/Sep 26 2026.md', new Date('2026-09-27T07:00:00.000Z').getTime()],
+    ]);
+
+    const plan = planTodoistReconciliation(local, remote, 'Inbox', '', fileMtimes);
+
+    // Remote is newer: local task should be updated with new due date
+    expect(plan.updateLocalDueDates).toHaveLength(1);
+    expect(plan.updateLocalDueDates![0].newDueDate).toBe('2026-10-04');
+    expect(plan.updateLocalDueDates![0].task.id).toBe(local[0].id);
+
+    // Should NOT push date back to remote
+    expect(plan.update).toHaveLength(0);
+  });
+
+  it('schedules remote update when local mtime is newer than remote updated_at', () => {
+    const local = [
+      task({
+        filePath: 'Jots/2026/Sep/Sep 26 2026.md',
+        rawText: '- [ ] Bed on floor 📅 2026-10-10 <!-- {"uuid":"111","todoistId":"tod_bed"} -->',
+        description: 'Bed on floor 📅 2026-10-10',
+        dueDate: '2026-10-10',
+      }),
+    ];
+
+    const remote: TodoistTask[] = [
+      {
+        id: 'tod_bed',
+        project_id: 'proj_1',
+        content: 'Bed on floor',
+        is_completed: false,
+        priority: 4,
+        due: { date: '2026-10-04' },
+        updated_at: '2026-09-27T07:00:00.000Z',
+      },
+    ];
+
+    const fileMtimes = new Map<string, number>([
+      ['Jots/2026/Sep/Sep 26 2026.md', new Date('2026-09-27T08:00:00.000Z').getTime()],
+    ]);
+
+    const plan = planTodoistReconciliation(local, remote, 'Inbox', '', fileMtimes);
+
+    // Local is newer: should schedule remote update with local due date
+    expect(plan.update).toHaveLength(1);
+    expect(plan.update[0].todoistId).toBe('tod_bed');
+    expect(plan.updateLocalDueDates).toHaveLength(0);
+  });
+
+  it('handles remote due date removal when remote is newer', () => {
+    const local = [
+      task({
+        filePath: 'Jots/2026/Sep/Sep 26 2026.md',
+        rawText: '- [ ] Bed on floor 📅 2026-09-26 <!-- {"uuid":"111","todoistId":"tod_bed"} -->',
+        description: 'Bed on floor 📅 2026-09-26',
+        dueDate: '2026-09-26',
+      }),
+    ];
+
+    const remote: TodoistTask[] = [
+      {
+        id: 'tod_bed',
+        project_id: 'proj_1',
+        content: 'Bed on floor',
+        is_completed: false,
+        priority: 4,
+        due: null,
+        updated_at: '2026-09-27T08:00:00.000Z',
+      },
+    ];
+
+    const fileMtimes = new Map<string, number>([
+      ['Jots/2026/Sep/Sep 26 2026.md', new Date('2026-09-27T07:00:00.000Z').getTime()],
+    ]);
+
+    const plan = planTodoistReconciliation(local, remote, 'Inbox', '', fileMtimes);
+
+    expect(plan.updateLocalDueDates).toHaveLength(1);
+    expect(plan.updateLocalDueDates![0].newDueDate).toBeNull();
+    expect(plan.update).toHaveLength(0);
+  });
+});
+
 
 
