@@ -49,6 +49,10 @@ export default class GTDMatrixPlugin extends Plugin {
       this.activateView();
     });
 
+    this.addRibbonIcon('refresh-cw', 'Sync Todoist Now', () => {
+      void this.todoistSync.syncNow(true);
+    });
+
     this.addCommand({
       id: 'open-view',
       name: 'Open GTD Matrix Tasks',

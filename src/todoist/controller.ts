@@ -22,6 +22,7 @@ import { setTaskCompletion } from '../parser';
 
 export class TodoistSyncController {
   private timer: number | null = null;
+  private intervalTimer: number | null = null;
   private unsubscribe: (() => void) | null = null;
   private running: Promise<void> | null = null;
   private status: TodoistSyncStatus = {
@@ -40,7 +41,14 @@ export class TodoistSyncController {
   start(): void {
     this.unsubscribe = this.scanner.onTasksUpdated(() => this.schedule());
     this.refreshConnectionState();
-    this.schedule(2000);
+    this.schedule(3000);
+
+    const intervalMinutes = Math.max(1, this.getSettings().todoistSyncIntervalMinutes || 5);
+    this.intervalTimer = window.setInterval(() => {
+      if (this.getSettings().todoistSyncEnabled) {
+        void this.syncNow(false);
+      }
+    }, intervalMinutes * 60 * 1000);
   }
 
   stop(): void {
@@ -48,6 +56,8 @@ export class TodoistSyncController {
     this.unsubscribe = null;
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = null;
+    if (this.intervalTimer !== null) window.clearInterval(this.intervalTimer);
+    this.intervalTimer = null;
   }
 
   getStatus(): TodoistSyncStatus {
