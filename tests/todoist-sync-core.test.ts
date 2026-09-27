@@ -481,6 +481,12 @@ describe('updateTaskLineDueDate', () => {
     const updated = updateTaskLineDueDate(line, '2026-10-04');
     expect(updated).toBe('- [ ] Task with crlf 📅 2026-10-04 <!-- {"uuid":"666"} -->\r');
   });
+
+  it('preserves leading indentation on child tasks', () => {
+    const line = '    - [ ] Indented child task 📅 2026-09-26 <!-- {"uuid":"777"} -->';
+    const updated = updateTaskLineDueDate(line, '2026-10-04');
+    expect(updated).toBe('    - [ ] Indented child task 📅 2026-10-04 <!-- {"uuid":"777"} -->');
+  });
 });
 
 describe('Todoist Reconciliation Due Date Synchronization', () => {

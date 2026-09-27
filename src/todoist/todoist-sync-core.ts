@@ -205,30 +205,35 @@ const TASK_DATE_RE = /[\u{1F4C5}\u{1F6EB}\u23F3]\s*\d{4}-\d{2}-\d{2}(?:[T ]\d{1,
 
 export function updateTaskLineDueDate(line: string, newDueDate: string | null): string {
   const hasCr = line.endsWith('\r');
-  let cleanLine = line.replace(/\r$/, '').replace(TASK_DATE_RE, '');
-  cleanLine = cleanLine.replace(/[ \t]{2,}/g, ' ');
+  const indentMatch = line.match(/^([ \t]*)/);
+  const indent = indentMatch ? indentMatch[1] : '';
+  const withoutIndent = line.slice(indent.length);
 
-  const commentMatch = cleanLine.match(/\s*(<!--.*?-->)\s*$/);
-  let updatedLine: string;
+  let cleanContent = withoutIndent.replace(/\r$/, '').replace(TASK_DATE_RE, '');
+  cleanContent = cleanContent.replace(/[ \t]{2,}/g, ' ');
+
+  const commentMatch = cleanContent.match(/\s*(<!--.*?-->)\s*$/);
+  let updatedContent: string;
 
   if (newDueDate) {
     if (commentMatch && commentMatch.index !== undefined) {
-      const beforeComment = cleanLine.slice(0, commentMatch.index).trimEnd();
+      const beforeComment = cleanContent.slice(0, commentMatch.index).trimEnd();
       const comment = commentMatch[1];
-      updatedLine = `${beforeComment} 📅 ${newDueDate} ${comment}`;
+      updatedContent = `${beforeComment} 📅 ${newDueDate} ${comment}`;
     } else {
-      updatedLine = `${cleanLine.trimEnd()} 📅 ${newDueDate}`;
+      updatedContent = `${cleanContent.trimEnd()} 📅 ${newDueDate}`;
     }
   } else {
     if (commentMatch && commentMatch.index !== undefined) {
-      const beforeComment = cleanLine.slice(0, commentMatch.index).trimEnd();
+      const beforeComment = cleanContent.slice(0, commentMatch.index).trimEnd();
       const comment = commentMatch[1];
-      updatedLine = `${beforeComment} ${comment}`;
+      updatedContent = `${beforeComment} ${comment}`;
     } else {
-      updatedLine = cleanLine.trimEnd();
+      updatedContent = cleanContent.trimEnd();
     }
   }
 
+  const updatedLine = `${indent}${updatedContent.trimStart()}`;
   return hasCr ? `${updatedLine}\r` : updatedLine;
 }
 
