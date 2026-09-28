@@ -148,13 +148,18 @@ export class TodoistSyncController {
 
       // 2. Fetch remote tasks
       const remoteTasks = await client.getTasks();
+      const completedSince = new Date(Date.now() - 89 * 24 * 60 * 60 * 1000);
+      const completedTasks = await client.getRecentlyCompletedTasks(completedSince);
+      const activeIds = new Set(remoteTasks.map((task) => task.id));
+      remoteTasks.push(...completedTasks.filter((task) => !activeIds.has(task.id)));
       const remoteTaskMap = new Map<string, TodoistTask>();
       for (const r of remoteTasks) {
         remoteTaskMap.set(r.id, r);
       }
 
       // 3. Fetch local tasks
-      const localTasks = this.scanner.getTasks();
+      // A persisted snapshot can predate a Git or Remotely Save pull. Reconcile against disk.
+      const localTasks = await this.scanner.scanVault();
       const fileMtimeMap = new Map<string, number>();
       for (const task of localTasks) {
         if (!fileMtimeMap.has(task.filePath)) {
@@ -298,12 +303,13 @@ export class TodoistSyncController {
         createdIdMap.set(task.id, created.id);
 
         // Write todoistId back into Obsidian markdown task line
-        await this.scanner.updateTaskLine(
+        const linked = await this.scanner.updateTaskLine(
           task.filePath,
           task.lineNumber,
           task.rawText,
           (line) => ensureTodoistIdentity(line, created.id)
         );
+        if (!linked) throw new Error(`Created Todoist task ${created.id}, but could not store its ID in ${task.filePath}:${task.lineNumber}`);
         createdCount++;
       }
 

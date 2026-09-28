@@ -3,6 +3,8 @@ import type { TaskItem } from '../src/types';
 import type { TodoistTask } from '../src/todoist/todoist-types';
 import {
   cleanTodoistTaskTitle,
+  cleanTodoistDescription,
+  buildTodoistTaskDescription,
   ensureTodoistIdentity,
   extractTodoistId,
   extractTodoistLabels,
@@ -11,6 +13,7 @@ import {
   mergeTodoistLabelsToLocalLine,
   planTodoistReconciliation,
   resolveFacetProjectName,
+  resolveTodoistDueDate,
   updateTaskLineDueDate,
 } from '../src/todoist/todoist-sync-core';
 
@@ -186,7 +189,6 @@ describe('Todoist Reconciliation Planning', () => {
 
 describe('Todoist Date Resolution (Option A)', () => {
   it('prefers startDate over scheduledDate and dueDate', () => {
-    const { resolveTodoistDueDate } = require('../src/todoist/todoist-sync-core');
     expect(resolveTodoistDueDate(task({ startDate: '2026-09-27', dueDate: '2026-09-30' }))).toBe('2026-09-27');
     expect(resolveTodoistDueDate(task({ startDate: null, scheduledDate: '2026-09-27', dueDate: '2026-09-30' }))).toBe('2026-09-27');
     expect(resolveTodoistDueDate(task({ startDate: null, scheduledDate: null, dueDate: '2026-09-30' }))).toBe('2026-09-30');
@@ -195,11 +197,6 @@ describe('Todoist Date Resolution (Option A)', () => {
 });
 
 describe('Todoist Task Description & Child Notes', () => {
-  const {
-    cleanTodoistDescription,
-    buildTodoistTaskDescription,
-  } = require('../src/todoist/todoist-sync-core');
-
   it('cleans wikilinks and hidden comments in child notes', () => {
     const raw = '- Check [[Executive Dashboard|Exec Dash]] specs <!-- comment -->\n- Follow up on [[Partner Reliability]]';
     const cleaned = cleanTodoistDescription(raw);

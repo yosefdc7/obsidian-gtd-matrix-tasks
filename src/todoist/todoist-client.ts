@@ -77,6 +77,27 @@ export class TodoistClient {
     }));
   }
 
+  async getRecentlyCompletedTasks(since: Date, until: Date = new Date()): Promise<TodoistTask[]> {
+    const tasks: TodoistTask[] = [];
+    let cursor: string | undefined;
+    do {
+      const query = new URLSearchParams({ since: since.toISOString(), until: until.toISOString(), limit: '50' });
+      if (cursor) query.set('cursor', cursor);
+      const page = await this.request<{ items: Array<Record<string, unknown>>; next_cursor?: string }>(
+        `/tasks/completed/by_completion_date?${query.toString()}`
+      );
+      for (const item of page.items ?? []) {
+        tasks.push({
+          id: String(item.id), project_id: String(item.project_id), content: String(item.content ?? ''),
+          is_completed: true, priority: typeof item.priority === 'number' ? item.priority : 1,
+          updated_at: typeof item.updated_at === 'string' ? item.updated_at : undefined,
+        });
+      }
+      cursor = page.next_cursor || undefined;
+    } while (cursor);
+    return tasks;
+  }
+
   async createTask(params: CreateTodoistTaskParams): Promise<TodoistTask> {
     return this.request<TodoistTask>('/tasks', 'POST', params);
   }

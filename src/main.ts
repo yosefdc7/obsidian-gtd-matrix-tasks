@@ -9,6 +9,7 @@ import { reconcileNoteContent, isWithinActiveWindow } from './context-linker';
 import { HoverManager } from './hover-manager';
 import { CalendarSyncController } from './calendar/controller';
 import { TodoistSyncController } from './todoist/controller';
+import { taskMetadataViewPlugin } from './editor/task-metadata-decorator';
 
 export default class GTDMatrixPlugin extends Plugin {
   public settings: PluginSettings = DEFAULT_SETTINGS;
@@ -30,6 +31,9 @@ export default class GTDMatrixPlugin extends Plugin {
     this.calendarSync.start();
     this.todoistSync = new TodoistSyncController(this.app, this.scanner, () => this.settings);
     this.todoistSync.start();
+
+    // Register CodeMirror 6 extension to collapse task identity metadata in Live Preview
+    this.registerEditorExtension(taskMetadataViewPlugin);
 
     this.registerObsidianProtocolHandler('gtd-calendar-auth', (params) => {
       void this.calendarSync.handleOAuthCallback(params).catch((error) => {
