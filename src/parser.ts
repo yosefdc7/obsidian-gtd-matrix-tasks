@@ -644,9 +644,21 @@ export function getIndentWidth(line: string): number {
 export function parseFileTasks(lines: string[], filePath: string): TaskItem[] {
   const tasks: TaskItem[] = [];
   const stack: { task: TaskItem; indentWidth: number }[] = [];
+  let codeFence: string | null = null;
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const rawLine = lines[lineIdx].replace(/\r$/, '');
+    const fence = rawLine.trimStart().match(/^(`{3,}|~{3,})/);
+    if (fence) {
+      if (!codeFence) {
+        codeFence = fence[1];
+        stack.length = 0;
+      } else if (fence[1][0] === codeFence[0] && fence[1].length >= codeFence.length) {
+        codeFence = null;
+      }
+      continue;
+    }
+    if (codeFence) continue;
 
     // Markdown headings (#, ##, etc.) reset the task outline stack
     if (/^#{1,6}\s/.test(rawLine.trimStart())) {

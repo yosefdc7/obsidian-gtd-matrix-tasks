@@ -48,7 +48,7 @@ describe('daily-jot-task-inserter', () => {
     );
   });
 
-  it('appends child description lines as indented notes while stripping deep links', () => {
+  it('does not reimport descriptions written by the Obsidian projection', () => {
     const remote: TodoistTask = {
       id: '554433',
       project_id: 'p1',
@@ -59,9 +59,15 @@ describe('daily-jot-task-inserter', () => {
     };
 
     const formatted = formatInboundTaskBlock(remote, 'uuid-5678');
-    expect(formatted).toBe(
-      `- [ ] Setup server environment <!-- {"uuid":"uuid-5678","todoistId":"554433"} -->\n  Check SSH keys\n  Verify open ports`
-    );
+    expect(formatted).toBe('- [ ] Setup server environment <!-- {"uuid":"uuid-5678","todoistId":"554433"} -->');
+  });
+
+  it('keeps notes on tasks created directly in Todoist', () => {
+    const remote: TodoistTask = {
+      id: '554434', project_id: 'p1', content: 'Setup server environment',
+      is_completed: false, priority: 1, description: 'Check SSH keys\nVerify open ports'
+    };
+    expect(formatInboundTaskBlock(remote, 'uuid-5679')).toContain('\n  Check SSH keys\n  Verify open ports');
   });
 
   it('safely inserts task under ## [[Yo the Manager]] before Dataview / Embeds', () => {

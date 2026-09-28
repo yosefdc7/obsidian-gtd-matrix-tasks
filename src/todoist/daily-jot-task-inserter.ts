@@ -63,7 +63,9 @@ export function formatInboundTaskBlock(remoteTask: TodoistTask, uuid: string): s
   const taskLine = `- [ ] ${title}${prioEmoji}${dueStr}${tagsStr}${commentStr}`;
 
   // Process optional description lines
-  if (remoteTask.description && remoteTask.description.trim()) {
+  // A managed Obsidian deep link means this description came from our outbound
+  // projection. Reimporting it can turn vault code or stale notes into task children.
+  if (remoteTask.description && remoteTask.description.trim() && !remoteTask.description.includes('obsidian://open?')) {
     const descLines = remoteTask.description
       .split('\n')
       .map((l) => l.trimEnd())

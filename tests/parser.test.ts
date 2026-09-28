@@ -235,5 +235,21 @@ describe('Section Routing', () => {
       expect(tasks).toHaveLength(2);
       expect(tasks[1].parentTaskId).toBeUndefined();
     });
+
+    it('does not attach code block lines to a preceding task', () => {
+      const lines = [
+        '- [ ] Clean up sept jira',
+        '',
+        '```dataviewjs',
+        '  dv.container.createEl("hr");',
+        '  const weeklyPath = "Weekly/example.md";',
+        '```',
+        '- [ ] Another task'
+      ];
+      const tasks = parseFileTasks(lines, 'Jots/2026/Sep/Sep 28 2026.md');
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].childNotes).toBeUndefined();
+      expect(tasks[1].parentTaskId).toBeUndefined();
+    });
   });
 });
