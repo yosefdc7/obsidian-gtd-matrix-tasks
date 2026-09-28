@@ -19,6 +19,12 @@ import {
   updateTaskLineDueDate,
 } from './todoist-sync-core';
 import { setTaskCompletion } from '../parser';
+import {
+  ensureDailyJotFile,
+  formatInboundTaskBlock,
+  insertTaskIntoDailyJotContent,
+  resolveTargetSectionHeader,
+} from './daily-jot-task-inserter';
 
 export class TodoistSyncController {
   private timer: number | null = null;
@@ -123,8 +129,10 @@ export class TodoistSyncController {
       // 1. Fetch remote projects and map by name
       const remoteProjects = await client.getProjects();
       const projectMap = new Map<string, string>();
+      const projectIdToNameMap = new Map<string, string>();
       for (const p of remoteProjects) {
         projectMap.set(p.name.toLowerCase(), p.id);
+        projectIdToNameMap.set(p.id, p.name);
       }
 
       // Helper to ensure target project exists in Todoist
@@ -164,13 +172,15 @@ export class TodoistSyncController {
         remoteTasks,
         settings.todoistDefaultProject || 'Inbox',
         vaultName,
-        fileMtimeMap
+        fileMtimeMap,
+        projectIdToNameMap
       );
 
       let createdCount = 0;
       let updatedCount = 0;
       let closedCount = 0;
       let localCompletedCount = 0;
+      let localCreatedCount = 0;
       let localLabelsUpdatedCount = 0;
       let localDueDatesUpdatedCount = 0;
 
@@ -218,6 +228,25 @@ export class TodoistSyncController {
           );
           if (success) localDueDatesUpdatedCount++;
         }
+      }
+
+      // 5d. Apply plan: Create local tasks in today's Daily Jot for new tasks in Todoist
+      if (plan.createLocalTasks && plan.createLocalTasks.length > 0) {
+        const dailyFile = await ensureDailyJotFile(this.app, settings.defaultDailyNoteFolder || 'Jots');
+
+        for (const { remoteTask, projectName } of plan.createLocalTasks) {
+          const targetHeader = resolveTargetSectionHeader(projectName);
+          const taskUuid = crypto.randomUUID().toLowerCase();
+          const taskBlock = formatInboundTaskBlock(remoteTask, taskUuid);
+
+          await this.app.vault.process(dailyFile, (data) => {
+            return insertTaskIntoDailyJotContent(data, targetHeader, taskBlock);
+          });
+          localCreatedCount++;
+        }
+
+        // Reindex the modified daily note so scanner and store immediately track the new tasks
+        await this.scanner.reindexFile(dailyFile);
       }
 
       // 6. Apply plan: Close remote tasks checked off in Obsidian
@@ -346,11 +375,14 @@ export class TodoistSyncController {
 
       if (showNotice) {
         const parts = [
-          `${createdCount} created`,
+          `${createdCount} created in Todoist`,
           `${updatedCount} updated`,
           `${closedCount} closed`,
           `${localCompletedCount} completed locally`,
         ];
+        if (localCreatedCount > 0) {
+          parts.push(`${localCreatedCount} created in Daily Jot`);
+        }
         if (localLabelsUpdatedCount > 0) {
           parts.push(`${localLabelsUpdatedCount} tags updated locally`);
         }

@@ -242,10 +242,12 @@ export function planTodoistReconciliation(
   remoteTasks: TodoistTask[],
   defaultProject = 'Inbox',
   vaultName = '',
-  fileMtimes?: Map<string, number>
+  fileMtimes?: Map<string, number>,
+  projectIdToName?: Map<string, string>
 ): TodoistReconciliationPlan {
   const plan: TodoistReconciliationPlan = {
     create: [],
+    createLocalTasks: [],
     update: [],
     move: [],
     closeTodoistIds: [],
@@ -365,6 +367,35 @@ export function planTodoistReconciliation(
     if (aHasParent !== bHasParent) return aHasParent - bHasParent;
     return a.task.lineNumber - b.task.lineNumber;
   });
+
+  // Collect all remote tasks that already exist locally
+  const linkedRemoteIds = new Set<string>();
+  for (const task of localTasks) {
+    const todoistId = extractTodoistId(task.rawText);
+    if (todoistId) {
+      linkedRemoteIds.add(todoistId);
+    }
+  }
+
+  // Identify unlinked, active remote tasks to create locally in Obsidian
+  for (const remote of remoteTasks) {
+    if (!remote.is_completed && !linkedRemoteIds.has(remote.id)) {
+      const projectName = projectIdToName?.get(remote.project_id) || defaultProject;
+      plan.createLocalTasks?.push({
+        remoteTask: remote,
+        projectName,
+      });
+    }
+  }
+
+  // Ensure root parent tasks come before child subtasks in createLocalTasks
+  if (plan.createLocalTasks && plan.createLocalTasks.length > 1) {
+    plan.createLocalTasks.sort((a, b) => {
+      const aHasParent = a.remoteTask.parent_id ? 1 : 0;
+      const bHasParent = b.remoteTask.parent_id ? 1 : 0;
+      return aHasParent - bHasParent;
+    });
+  }
 
   return plan;
 }

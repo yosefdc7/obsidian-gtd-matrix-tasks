@@ -595,5 +595,75 @@ describe('Todoist Reconciliation Due Date Synchronization', () => {
   });
 });
 
+describe('Todoist Inbound Task Creation Planning', () => {
+  it('identifies unlinked open remote tasks and queues them in createLocalTasks', () => {
+    const local = [
+      task({
+        rawText: '- [ ] Existing task <!-- {"uuid":"u1","todoistId":"t_exist"} -->',
+        description: 'Existing task',
+      }),
+    ];
+
+    const remote: TodoistTask[] = [
+      {
+        id: 't_exist',
+        project_id: 'proj_yo',
+        content: 'Existing task',
+        is_completed: false,
+        priority: 1,
+      },
+      {
+        id: 't_new_1',
+        project_id: 'proj_yo',
+        content: 'Brand new task from phone',
+        is_completed: false,
+        priority: 4,
+        due: { date: '2026-10-02' },
+      },
+      {
+        id: 't_completed',
+        project_id: 'proj_yo',
+        content: 'Old finished task',
+        is_completed: true,
+        priority: 1,
+      },
+    ];
+
+    const projMap = new Map([['proj_yo', 'Yo the Manager']]);
+    const plan = planTodoistReconciliation(local, remote, 'Inbox', '', undefined, projMap);
+
+    expect(plan.createLocalTasks).toHaveLength(1);
+    expect(plan.createLocalTasks![0].remoteTask.id).toBe('t_new_1');
+    expect(plan.createLocalTasks![0].projectName).toBe('Yo the Manager');
+  });
+
+  it('orders parent tasks before child subtasks in createLocalTasks', () => {
+    const local: TaskItem[] = [];
+    const remote: TodoistTask[] = [
+      {
+        id: 'child_1',
+        project_id: 'p1',
+        content: 'Subtask item',
+        is_completed: false,
+        priority: 1,
+        parent_id: 'parent_1',
+      },
+      {
+        id: 'parent_1',
+        project_id: 'p1',
+        content: 'Parent item',
+        is_completed: false,
+        priority: 3,
+      },
+    ];
+
+    const plan = planTodoistReconciliation(local, remote, 'Inbox');
+
+    expect(plan.createLocalTasks).toHaveLength(2);
+    expect(plan.createLocalTasks![0].remoteTask.id).toBe('parent_1');
+    expect(plan.createLocalTasks![1].remoteTask.id).toBe('child_1');
+  });
+});
+
 
 

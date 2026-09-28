@@ -33,8 +33,14 @@ export interface TodoistSyncStatus {
   lastError: string | null;
 }
 
+export interface InboundTaskPlan {
+  remoteTask: TodoistTask;
+  projectName: string;
+}
+
 export interface TodoistReconciliationPlan {
   create: Array<{ task: TaskItem; projectName: string }>;
+  createLocalTasks?: InboundTaskPlan[];
   update: Array<{ todoistId: string; task: TaskItem; projectName: string }>;
   move?: Array<{ todoistId: string; parentId: string }>;
   closeTodoistIds: string[];
