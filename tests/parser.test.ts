@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseTaskLine,
+  parseFileTasks,
   setTaskPriority,
   setTaskCompletion,
   setTaskDueDate,
@@ -178,7 +179,6 @@ describe('Section Routing', () => {
 
   describe('File Task Hierarchy & Child Notes Parser', () => {
     it('parses child notes indented under parent task', () => {
-      const { parseFileTasks } = require('../src/parser');
       const lines = [
         '- [ ] Call Diana 📅 2026-09-26',
         '    - Ask about baby formula',
@@ -194,7 +194,6 @@ describe('Section Routing', () => {
     });
 
     it('identifies child checkboxes as subtasks with parentTaskId and parentLineNumber', () => {
-      const { parseFileTasks } = require('../src/parser');
       const lines = [
         '- [ ] Parent Project Plan',
         '    - Context note',
@@ -227,7 +226,6 @@ describe('Section Routing', () => {
     });
 
     it('resets outline stack on markdown headings', () => {
-      const { parseFileTasks } = require('../src/parser');
       const lines = [
         '- [ ] Task above heading',
         '## Next Section',

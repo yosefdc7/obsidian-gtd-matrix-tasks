@@ -3,6 +3,26 @@ import type { HttpTransport } from '../src/calendar/google-calendar-client';
 import { TodoistClient } from '../src/todoist/todoist-client';
 
 describe('TodoistClient', () => {
+  it('fetches every active task page', async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({ status: 200, json: { results: [{ id: 'open_1', project_id: 'p', content: 'A' }], next_cursor: 'page2' }, text: '' })
+      .mockResolvedValueOnce({ status: 200, json: { results: [{ id: 'open_2', project_id: 'p', content: 'B' }], next_cursor: null }, text: '' });
+    const tasks = await new TodoistClient('test_token', { request }).getTasks();
+
+    expect(tasks.map((task) => task.id)).toEqual(['open_1', 'open_2']);
+    expect(request.mock.calls[1][0].url).toContain('cursor=page2');
+  });
+  it('fetches all recent completed task pages', async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({ status: 200, json: { items: [{ id: 'done_1', project_id: 'p', content: 'A' }], next_cursor: 'page2' }, text: '' })
+      .mockResolvedValueOnce({ status: 200, json: { items: [{ id: 'done_2', project_id: 'p', content: 'B' }], next_cursor: null }, text: '' });
+    const client = new TodoistClient('test_token', { request });
+    const tasks = await client.getRecentlyCompletedTasks(new Date('2026-09-01T00:00:00Z'), new Date('2026-09-28T00:00:00Z'));
+
+    expect(tasks.map((task) => [task.id, task.is_completed])).toEqual([['done_1', true], ['done_2', true]]);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1][0].url).toContain('cursor=page2');
+  });
   it('sends Bearer authorization header and fetches projects from API v1', async () => {
     const transport: HttpTransport = {
       request: vi.fn().mockResolvedValue({
