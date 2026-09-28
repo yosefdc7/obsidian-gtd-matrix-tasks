@@ -58,11 +58,18 @@ export class TodoistClient {
   }
 
   async getTasks(filter?: string): Promise<TodoistTask[]> {
-    const query = filter ? `?filter=${encodeURIComponent(filter)}` : '';
-    const res = await this.request<{ results?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>>(
-      `/tasks${query}`
-    );
-    const list = Array.isArray(res) ? res : res?.results ?? [];
+    const list: Array<Record<string, unknown>> = [];
+    let cursor: string | undefined;
+    do {
+      const query = new URLSearchParams({ limit: '200' });
+      if (filter) query.set('filter', filter);
+      if (cursor) query.set('cursor', cursor);
+      const res = await this.request<{ results?: Array<Record<string, unknown>>; next_cursor?: string } | Array<Record<string, unknown>>>(
+        `/tasks?${query.toString()}`
+      );
+      list.push(...(Array.isArray(res) ? res : res?.results ?? []));
+      cursor = Array.isArray(res) ? undefined : res?.next_cursor || undefined;
+    } while (cursor);
     return list.map((t) => ({
       id: String(t.id),
       project_id: String(t.project_id),
