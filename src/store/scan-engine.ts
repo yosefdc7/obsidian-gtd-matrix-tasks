@@ -49,12 +49,6 @@ export class ScanEngine {
           const chunk = files.slice(i, i + CHUNK_SIZE);
           await Promise.all(
             chunk.map(async (file) => {
-              const cache = this.app.metadataCache.getFileCache(file);
-              // Skip reading file if metadata cache is populated and has no tasks
-              if (cache && (!cache.listItems || !cache.listItems.some((item) => item.task !== undefined))) {
-                return;
-              }
-
               try {
                 const content = await this.app.vault.cachedRead(file);
                 const lines = content.split('\n');
@@ -107,37 +101,33 @@ export class ScanEngine {
       return;
     }
 
-    const cache = this.app.metadataCache.getFileCache(file);
     const fileTasks: TaskItem[] = [];
 
-    // Only read file if it contains list items / tasks or cache is not ready
-    if (!cache || (cache.listItems && cache.listItems.some((i) => i.task !== undefined))) {
-      try {
-        const content = await this.app.vault.cachedRead(file);
-        const lines = content.split('\n');
-        const tasks = parseFileTasks(lines, file.path);
-        const taskById = new Map<string, TaskItem>();
+    try {
+      const content = await this.app.vault.cachedRead(file);
+      const lines = content.split('\n');
+      const tasks = parseFileTasks(lines, file.path);
+      const taskById = new Map<string, TaskItem>();
 
-        for (const task of tasks) {
-          const res = this.roleResolver.resolveTaskRole(task);
-          task.effectiveRole = res.role;
-          task.roleSource = res.source;
+      for (const task of tasks) {
+        const res = this.roleResolver.resolveTaskRole(task);
+        task.effectiveRole = res.role;
+        task.roleSource = res.source;
 
-          if (task.parentTaskId && task.effectiveRole === 'untagged') {
-            const parent = taskById.get(task.parentTaskId);
-            if (parent && parent.effectiveRole !== 'untagged') {
-              task.effectiveRole = parent.effectiveRole;
-              task.roleSource = parent.roleSource;
-            }
+        if (task.parentTaskId && task.effectiveRole === 'untagged') {
+          const parent = taskById.get(task.parentTaskId);
+          if (parent && parent.effectiveRole !== 'untagged') {
+            task.effectiveRole = parent.effectiveRole;
+            task.roleSource = parent.roleSource;
           }
-
-          taskById.set(task.id, task);
-          fileTasks.push(task);
         }
-      } catch (err) {
-        console.error(`Error reindexing ${file.path} in GTD Matrix Tasks:`, err);
-        return;
+
+        taskById.set(task.id, task);
+        fileTasks.push(task);
       }
+    } catch (err) {
+      console.error(`Error reindexing ${file.path} in GTD Matrix Tasks:`, err);
+      return;
     }
 
     this.store.replaceFileTasks(file.path, fileTasks);
